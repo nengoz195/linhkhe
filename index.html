@@ -22,7 +22,6 @@
         .glass-card { transition: all 0.3s ease; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        img { max-width: 100%; height: auto; }
     </style>
 </head>
 <body>
@@ -33,8 +32,8 @@
 
         // --- CẤU HÌNH CỦA BẠN ---
         const CONFIG = {
-            // Thêm ?v=1 vào cuối để xóa cache JsDelivr khi bạn vừa cập nhật file
-            JSON_URL: 'https://cdn.jsdelivr.net/gh/nengoz195/data-truyen-tranh@main/data.json?v=' + Date.now(), 
+            // Đã dán link data.json của bạn vào đây
+            JSON_URL: 'https://cdn.jsdelivr.net/gh/nengoz195/data-truyen-tranh@main/data.json', 
             GITHUB_USER: 'nengoz195',
             GITHUB_REPO: 'data-truyen-tranh',
             GITHUB_BRANCH: 'main',
@@ -49,17 +48,22 @@
             // Fetch dữ liệu từ JSON
             useEffect(() => {
                 const loadData = async () => {
+                    if (!CONFIG.JSON_URL) {
+                        // Dữ liệu mẫu nếu chưa có JSON
+                        const mock = [];
+                        for(let i=20; i>=1; i--) {
+                            mock.push({ id: i, title: `Chương ${i}: [Dữ liệu mẫu]`, updatedAt: '27/10/2025', folder: `chap-${i}`, totalImages: 18 });
+                        }
+                        setChapters(mock);
+                        setIsLoading(false);
+                        return;
+                    }
                     try {
                         const res = await fetch(CONFIG.JSON_URL);
-                        if (!res.ok) throw new Error("Lỗi tải file");
                         const data = await res.json();
-                        // Sắp xếp chương mới nhất lên đầu (id lớn nhất lên đầu)
-                        data.sort((a, b) => b.id - a.id);
                         setChapters(data);
                     } catch (e) {
                         console.error("Lỗi tải JSON:", e);
-                        // Fallback data if fetch fails
-                        setChapters([{ id: 1, title: "Lỗi kết nối dữ liệu", updatedAt: "-", folder: "chap-1", totalImages: 0 }]);
                     } finally {
                         setIsLoading(false);
                     }
@@ -70,6 +74,7 @@
             // Link ảnh định dạng 001.jpg
             const getImgUrl = (folder, index) => {
                 const pad = index.toString().padStart(3, '0');
+                if (!CONFIG.JSON_URL) return `https://placehold.co/600x900/e1f5fe/1e3a8a?text=Trang+${pad}`;
                 return `https://cdn.jsdelivr.net/gh/${CONFIG.GITHUB_USER}/${CONFIG.GITHUB_REPO}@${CONFIG.GITHUB_BRANCH}/${CONFIG.COMIC_PATH}/${folder}/${pad}.jpg`;
             };
 
@@ -79,7 +84,7 @@
                 return (
                     <div className="min-h-screen bg-gray-900 font-inter text-white">
                         <div className="sticky top-0 z-50 flex items-center justify-between p-4 bg-blue-600 shadow-xl">
-                            <button onClick={() => { setReadingChapter(null); window.scrollTo(0,0); }} className="font-bold flex items-center gap-2 bg-blue-700 px-4 py-2 rounded-lg hover:bg-blue-800 transition-all">
+                            <button onClick={() => setReadingChapter(null)} className="font-bold flex items-center gap-2 bg-blue-700 px-4 py-2 rounded-lg hover:bg-blue-800">
                                 ⬅ Quay lại
                             </button>
                             <h2 className="font-black truncate max-w-[50%]">{readingChapter.title}</h2>
@@ -87,22 +92,11 @@
                         </div>
                         <div className="max-w-3xl mx-auto bg-black">
                             {Array.from({ length: readingChapter.totalImages }).map((_, i) => (
-                                <div key={i} className="min-h-[400px] bg-gray-800 flex items-center justify-center relative">
-                                    <img 
-                                        src={getImgUrl(readingChapter.folder, i + 1)} 
-                                        className="w-full h-auto block relative z-10" 
-                                        loading="lazy" 
-                                        alt={`Trang ${i+1}`}
-                                        onError={(e) => { e.target.style.display = 'none'; }}
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-xs italic">Đang tải trang {i+1}...</div>
-                                </div>
+                                <img key={i} src={getImgUrl(readingChapter.folder, i + 1)} className="w-full h-auto block" loading="lazy" />
                             ))}
                         </div>
-                        <div className="p-12 text-center bg-gray-900">
-                            <button onClick={() => { setReadingChapter(null); window.scrollTo(0,0); }} className="bg-blue-500 hover:bg-blue-600 px-10 py-4 rounded-full font-bold shadow-lg transition-all transform hover:scale-105">
-                                Xong rồi! Về Trang Chủ 🏠
-                            </button>
+                        <div className="p-10 text-center">
+                            <button onClick={() => { setReadingChapter(null); window.scrollTo(0,0); }} className="bg-blue-500 px-8 py-3 rounded-full font-bold">Về Trang Chủ</button>
                         </div>
                     </div>
                 );
@@ -142,7 +136,7 @@
                                             </p>
 
                                             <div className="mt-8 text-center">
-                                                <button onClick={() => latestChapter && openChapter(latestChapter)}
+                                                <button onClick={() => latestChapter && setReadingChapter(latestChapter)}
                                                    className="inline-block bg-gradient-to-r from-sky-300 to-blue-200 text-white font-bold text-lg py-3 px-10 rounded-full shadow-lg transform transition-all duration-300 hover:scale-110">
                                                     💠 Đọc chương mới nhất ({latestChapter?.id}) 💠
                                                 </button>
@@ -161,14 +155,12 @@
                                                 <div className="flex justify-center p-10"><div className="loader"></div></div>
                                             ) : (
                                                 chapters.map((ch) => (
-                                                    <div key={ch.id} onClick={() => openChapter(ch)}
-                                                       className="cursor-pointer block p-4 bg-blue-50 rounded-xl border border-transparent transition-all duration-300 hover:bg-blue-200 hover:border-blue-400 hover:translate-x-1 shadow-sm group">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="font-bold text-blue-900 group-hover:text-blue-700 transition-colors">{ch.title}</span>
+                                                    <div key={ch.id} onClick={() => { setReadingChapter(ch); window.scrollTo(0,0); }}
+                                                       className="cursor-pointer block p-4 bg-blue-50 rounded-xl border border-transparent transition-all duration-300 hover:bg-blue-200 hover:border-blue-400 hover:translate-x-1 shadow-sm">
+                                                        <span className="font-bold text-blue-900">{ch.title}</span>
+                                                        <div className="flex justify-between items-center mt-1">
+                                                            <span className="text-xs text-blue-600">Cập nhật: {ch.updatedAt}</span>
                                                             <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded-full font-bold text-blue-500 uppercase">{ch.totalImages} trang</span>
-                                                        </div>
-                                                        <div className="mt-1">
-                                                            <span className="text-xs text-blue-400">Cập nhật: {ch.updatedAt}</span>
                                                         </div>
                                                     </div>
                                                 ))
@@ -187,34 +179,30 @@
             );
         }
 
-        const openChapter = (chapter) => {
-            // Logic handled inside the component now to manage state properly
-        }
-
         const ParticleBackground = () => {
             const canvasRef = useRef(null);
             useEffect(() => {
                 const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d', { alpha: false });
+                const ctx = canvas.getContext('2d');
                 let frame, particles = [];
                 const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
                 class P {
                     constructor() {
                         this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height;
-                        this.s = Math.random() * 2 + 1; this.vx = (Math.random()-0.5)*0.3; this.vy = (Math.random()-0.5)*0.3;
-                        this.c = `hsl(${Math.random() * 40 + 195}, 100%, 85%)`;
+                        this.s = Math.random() * 2 + 1; this.vx = (Math.random()-0.5)*0.4; this.vy = (Math.random()-0.5)*0.4;
+                        this.c = `hsl(${Math.random() * 60 + 190}, 100%, ${Math.random() * 40 + 60}%)`;
                     }
                     u() { this.x += this.vx; this.y += this.vy; if(this.x<0||this.x>canvas.width)this.vx*=-1; if(this.y<0||this.y>canvas.height)this.vy*=-1; }
                     d() { ctx.beginPath(); ctx.arc(this.x, this.y, this.s, 0, Math.PI*2); ctx.fillStyle = this.c; ctx.fill(); }
                 }
-                const init = () => { particles = []; for(let i=0; i<50; i++) particles.push(new P()); };
+                const init = () => { particles = []; for(let i=0; i<70; i++) particles.push(new P()); };
                 const loop = () => {
-                    ctx.fillStyle = '#f0faff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                    ctx.fillStyle = 'rgba(240,248,255,0.15)'; ctx.fillRect(0,0,canvas.width,canvas.height);
                     particles.forEach(p => { p.u(); p.d(); });
                     for(let i=0; i<particles.length; i++) {
                         for(let j=i; j<particles.length; j++) {
                             const d = Math.sqrt((particles[i].x-particles[j].x)**2 + (particles[i].y-particles[j].y)**2);
-                            if(d<130) { ctx.strokeStyle = `rgba(100,181,246,${0.15 * (1-d/130)})`; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(particles[i].x,particles[i].y); ctx.lineTo(particles[j].x,particles[j].y); ctx.stroke(); }
+                            if(d<120) { ctx.strokeStyle = `rgba(100,181,246,${1-d/120})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(particles[i].x,particles[i].y); ctx.lineTo(particles[j].x,particles[j].y); ctx.stroke(); }
                         }
                     }
                     frame = requestAnimationFrame(loop);
