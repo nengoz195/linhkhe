@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linh Khế - Spiritpact</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        .font-inter { font-family: 'Inter', sans-serif; }
+        .fade-in-section { opacity: 0; transform: translateY(30px); transition: opacity 0.8s ease, transform 0.8s ease; }
+        .fade-in-section.is-visible { opacity: 1; transform: translateY(0); }
+        .chapter-list::-webkit-scrollbar { width: 6px; }
+        .chapter-list::-webkit-scrollbar-thumb { background-color: #64b5f6; border-radius: 10px; }
+        #particle-canvas { max-width: 100%; pointer-events: none; }
+        .glass-card { transition: all 0.3s ease; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- CẤU HÌNH CỦA BẠN ---
+        const CONFIG = {
+            // Đã dán link data.json của bạn vào đây
+            JSON_URL: 'https://cdn.jsdelivr.net/gh/nengoz195/data-truyen-tranh@main/data.json', 
+            GITHUB_USER: 'nengoz195',
+            GITHUB_REPO: 'data-truyen-tranh',
+            GITHUB_BRANCH: 'main',
+            COMIC_PATH: 'linh-khe'
+        };
+
+        function LinhKheApp() {
+            const [chapters, setChapters] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
+            const [readingChapter, setReadingChapter] = useState(null);
+
+            // Fetch dữ liệu từ JSON
+            useEffect(() => {
+                const loadData = async () => {
+                    if (!CONFIG.JSON_URL) {
+                        // Dữ liệu mẫu nếu chưa có JSON
+                        const mock = [];
+                        for(let i=20; i>=1; i--) {
+                            mock.push({ id: i, title: `Chương ${i}: [Dữ liệu mẫu]`, updatedAt: '27/10/2025', folder: `chap-${i}`, totalImages: 18 });
+                        }
+                        setChapters(mock);
+                        setIsLoading(false);
+                        return;
+                    }
+                    try {
+                        const res = await fetch(CONFIG.JSON_URL);
+                        const data = await res.json();
+                        setChapters(data);
+                    } catch (e) {
+                        console.error("Lỗi tải JSON:", e);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+                loadData();
+            }, []);
+
+            // Link ảnh định dạng 001.jpg
+            const getImgUrl = (folder, index) => {
+                const pad = index.toString().padStart(3, '0');
+                if (!CONFIG.JSON_URL) return `https://placehold.co/600x900/e1f5fe/1e3a8a?text=Trang+${pad}`;
+                return `https://cdn.jsdelivr.net/gh/${CONFIG.GITHUB_USER}/${CONFIG.GITHUB_REPO}@${CONFIG.GITHUB_BRANCH}/${CONFIG.COMIC_PATH}/${folder}/${pad}.jpg`;
+            };
+
+            const latestChapter = chapters[0];
+
+            if (readingChapter) {
+                return (
+                    <div className="min-h-screen bg-gray-900 font-inter text-white">
+                        <div className="sticky top-0 z-50 flex items-center justify-between p-4 bg-blue-600 shadow-xl">
+                            <button onClick={() => setReadingChapter(null)} className="font-bold flex items-center gap-2 bg-blue-700 px-4 py-2 rounded-lg hover:bg-blue-800">
+                                ⬅ Quay lại
+                            </button>
+                            <h2 className="font-black truncate max-w-[50%]">{readingChapter.title}</h2>
+                            <div className="text-xs opacity-70">{readingChapter.totalImages} trang</div>
+                        </div>
+                        <div className="max-w-3xl mx-auto bg-black">
+                            {Array.from({ length: readingChapter.totalImages }).map((_, i) => (
+                                <img key={i} src={getImgUrl(readingChapter.folder, i + 1)} className="w-full h-auto block" loading="lazy" />
+                            ))}
+                        </div>
+                        <div className="p-10 text-center">
+                            <button onClick={() => { setReadingChapter(null); window.scrollTo(0,0); }} className="bg-blue-500 px-8 py-3 rounded-full font-bold">Về Trang Chủ</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="linh-khe-wrapper font-inter text-gray-900" style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg,#b3e5fc,#e1f5fe,#bbdefb)', minHeight: '100vh' }}>
+                    <ParticleBackground />
+                    
+                    <div className="relative z-10 flex flex-col min-h-screen">
+                        {/* Header */}
+                        <header className="py-5 shadow-lg bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 m-2 sm:m-4 rounded-2xl text-center">
+                            <h1 className="text-3xl sm:text-4xl font-extrabold text-white drop-shadow-md">🌸 Linh Khế 🌸</h1>
+                            <p className="text-white/90 mt-1 text-sm sm:text-base">Khế ước giữa linh hồn và con người 💙</p>
+                        </header>
+
+                        {/* Main Content */}
+                        <main className="container mx-auto px-3 sm:px-6 py-8 relative z-10 flex-grow">
+                            <div className="grid grid-cols-1 gap-8">
+                                
+                                {/* Poster & Info */}
+                                <div className="fade-in-section is-visible glass-card rounded-2xl shadow-2xl bg-white/70 backdrop-blur-md overflow-hidden border border-white/50">
+                                    <div className="grid grid-cols-1 md:grid-cols-3">
+                                        <div className="md:col-span-1 p-6">
+                                            <img src="https://lh3.googleusercontent.com/pw/AP1GczNjbo5BXxddIRdCjw5_D_ZlgysBO3-3YHTMiFL-v32MIi51ut2AuP2o6HdNd1bumiaCoCKYiySt41HSllXq8MrctPlWDeJWRU_eTwh1TdIQ7wzX59y6NtBtHOvs2nXkK5gpA3__oEG4N27MScaHlbk=w670-h947-s-no-gm?authuser=0"
+                                                 alt="Poster Linh Khế"
+                                                 className="w-full h-auto object-cover rounded-xl shadow-lg transition-transform duration-500 hover:scale-105" />
+                                        </div>
+
+                                        <section id="info" className="md:col-span-2 p-6 sm:p-8 md:border-l border-blue-200/70">
+                                            <h2 className="text-4xl font-black mb-3 text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-indigo-500">Linh Khế (Spiritpact)</h2>
+                                            <p className="text-lg text-gray-700 font-semibold mb-6">Tác giả: Bình Tử</p>
+
+                                            <h3 className="text-2xl font-bold mb-3 text-blue-600">Giới thiệu</h3>
+                                            <p className="text-base text-gray-800 leading-relaxed">
+                                                Dương Kính Hoa, hậu duệ của gia tộc Trừ Tà Sư, sau một tai nạn đã hồi sinh và gặp Đoan Mộc Hy. Hai người ký kết “Linh Khế”, bắt đầu hành trình đầy gay cấn và ngọt ngào 💫
+                                            </p>
+
+                                            <div className="mt-8 text-center">
+                                                <button onClick={() => latestChapter && setReadingChapter(latestChapter)}
+                                                   className="inline-block bg-gradient-to-r from-sky-300 to-blue-200 text-white font-bold text-lg py-3 px-10 rounded-full shadow-lg transform transition-all duration-300 hover:scale-110">
+                                                    💠 Đọc chương mới nhất ({latestChapter?.id}) 💠
+                                                </button>
+                                            </div>
+                                        </section>
+                                    </div>
+                                </div>
+
+                                {/* Mục lục */}
+                                <aside className="relative">
+                                    <div id="chapters" className="fade-in-section is-visible glass-card rounded-2xl p-6 shadow-xl bg-white/70 backdrop-blur-md border border-white/50">
+                                        <h3 className="text-3xl font-bold mb-6 text-center text-blue-700 uppercase tracking-tighter">Mục Lục 📖</h3>
+
+                                        <nav className="chapter-list max-h-[600px] overflow-y-auto pr-2 space-y-3">
+                                            {isLoading ? (
+                                                <div className="flex justify-center p-10"><div className="loader"></div></div>
+                                            ) : (
+                                                chapters.map((ch) => (
+                                                    <div key={ch.id} onClick={() => { setReadingChapter(ch); window.scrollTo(0,0); }}
+                                                       className="cursor-pointer block p-4 bg-blue-50 rounded-xl border border-transparent transition-all duration-300 hover:bg-blue-200 hover:border-blue-400 hover:translate-x-1 shadow-sm">
+                                                        <span className="font-bold text-blue-900">{ch.title}</span>
+                                                        <div className="flex justify-between items-center mt-1">
+                                                            <span className="text-xs text-blue-600">Cập nhật: {ch.updatedAt}</span>
+                                                            <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded-full font-bold text-blue-500 uppercase">{ch.totalImages} trang</span>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </nav>
+                                    </div>
+                                </aside>
+                            </div>
+                        </main>
+
+                        <footer className="text-center py-6 mt-10 text-gray-700 text-sm bg-gradient-to-r from-sky-300 to-indigo-300 m-2 sm:m-4 rounded-2xl shadow-md font-bold uppercase tracking-widest">
+                            💙 Giao diện thiết kế bởi Thiên Trường Địa Cửu 💙
+                        </footer>
+                    </div>
+                </div>
+            );
+        }
+
+        const ParticleBackground = () => {
+            const canvasRef = useRef(null);
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                let frame, particles = [];
+                const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+                class P {
+                    constructor() {
+                        this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height;
+                        this.s = Math.random() * 2 + 1; this.vx = (Math.random()-0.5)*0.4; this.vy = (Math.random()-0.5)*0.4;
+                        this.c = `hsl(${Math.random() * 60 + 190}, 100%, ${Math.random() * 40 + 60}%)`;
+                    }
+                    u() { this.x += this.vx; this.y += this.vy; if(this.x<0||this.x>canvas.width)this.vx*=-1; if(this.y<0||this.y>canvas.height)this.vy*=-1; }
+                    d() { ctx.beginPath(); ctx.arc(this.x, this.y, this.s, 0, Math.PI*2); ctx.fillStyle = this.c; ctx.fill(); }
+                }
+                const init = () => { particles = []; for(let i=0; i<70; i++) particles.push(new P()); };
+                const loop = () => {
+                    ctx.fillStyle = 'rgba(240,248,255,0.15)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                    particles.forEach(p => { p.u(); p.d(); });
+                    for(let i=0; i<particles.length; i++) {
+                        for(let j=i; j<particles.length; j++) {
+                            const d = Math.sqrt((particles[i].x-particles[j].x)**2 + (particles[i].y-particles[j].y)**2);
+                            if(d<120) { ctx.strokeStyle = `rgba(100,181,246,${1-d/120})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(particles[i].x,particles[i].y); ctx.lineTo(particles[j].x,particles[j].y); ctx.stroke(); }
+                        }
+                    }
+                    frame = requestAnimationFrame(loop);
+                };
+                window.addEventListener('resize', () => { resize(); init(); });
+                resize(); init(); loop();
+                return () => cancelAnimationFrame(frame);
+            }, []);
+            return <canvas ref={canvasRef} id="particle-canvas" className="absolute top-0 left-0 w-full h-full z-1 opacity-50" />;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<LinhKheApp />);
+    </script>
+</body>
+</html>
