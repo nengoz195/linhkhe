@@ -32,8 +32,8 @@
 
         // --- CẤU HÌNH CỦA BẠN ---
         const CONFIG = {
-            // Đã dán link data.json của bạn vào đây
-            JSON_URL: 'https://cdn.jsdelivr.net/gh/nengoz195/data-truyen-tranh@main/data.json?v=194', 
+            // Link gốc đến file data.json
+            BASE_JSON_URL: 'https://cdn.jsdelivr.net/gh/nengoz195/data-truyen-tranh@main/data.json', 
             GITHUB_USER: 'nengoz195',
             GITHUB_REPO: 'data-truyen-tranh',
             GITHUB_BRANCH: 'main',
@@ -48,22 +48,20 @@
             // Fetch dữ liệu từ JSON
             useEffect(() => {
                 const loadData = async () => {
-                    if (!CONFIG.JSON_URL) {
-                        // Dữ liệu mẫu nếu chưa có JSON
-                        const mock = [];
-                        for(let i=20; i>=1; i--) {
-                            mock.push({ id: i, title: `Chương ${i}: [Dữ liệu mẫu]`, updatedAt: '27/10/2025', folder: `chap-${i}`, totalImages: 18 });
-                        }
-                        setChapters(mock);
-                        setIsLoading(false);
-                        return;
-                    }
                     try {
-                        const res = await fetch(CONFIG.JSON_URL);
+                        // Thêm timestamp (?t=...) để trình duyệt KHÔNG dùng cache cũ
+                        // Giúp cập nhật chương mới ngay lập tức khi bot vừa push code
+                        const cacheBuster = `?t=${new Date().getTime()}`;
+                        const url = CONFIG.BASE_JSON_URL + cacheBuster;
+                        
+                        const res = await fetch(url);
+                        if (!res.ok) throw new Error("Không thể tải dữ liệu");
+                        
                         const data = await res.json();
                         setChapters(data);
                     } catch (e) {
                         console.error("Lỗi tải JSON:", e);
+                        // Có thể thêm thông báo lỗi trên giao diện nếu cần
                     } finally {
                         setIsLoading(false);
                     }
@@ -74,11 +72,11 @@
             // Link ảnh định dạng 001.jpg
             const getImgUrl = (folder, index) => {
                 const pad = index.toString().padStart(3, '0');
-                if (!CONFIG.JSON_URL) return `https://placehold.co/600x900/e1f5fe/1e3a8a?text=Trang+${pad}`;
+                // Tự động lấy ảnh từ CDN Github
                 return `https://cdn.jsdelivr.net/gh/${CONFIG.GITHUB_USER}/${CONFIG.GITHUB_REPO}@${CONFIG.GITHUB_BRANCH}/${CONFIG.COMIC_PATH}/${folder}/${pad}.jpg`;
             };
 
-            const latestChapter = chapters[0];
+            const latestChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
 
             if (readingChapter) {
                 return (
@@ -90,9 +88,9 @@
                             <h2 className="font-black truncate max-w-[50%]">{readingChapter.title}</h2>
                             <div className="text-xs opacity-70">{readingChapter.totalImages} trang</div>
                         </div>
-                        <div className="max-w-3xl mx-auto bg-black">
+                        <div className="max-w-3xl mx-auto bg-black min-h-screen">
                             {Array.from({ length: readingChapter.totalImages }).map((_, i) => (
-                                <img key={i} src={getImgUrl(readingChapter.folder, i + 1)} className="w-full h-auto block" loading="lazy" />
+                                <img key={i} src={getImgUrl(readingChapter.folder, i + 1)} className="w-full h-auto block" loading="lazy" alt={`Trang ${i+1}`} />
                             ))}
                         </div>
                         <div className="p-10 text-center">
@@ -136,10 +134,14 @@
                                             </p>
 
                                             <div className="mt-8 text-center">
-                                                <button onClick={() => latestChapter && setReadingChapter(latestChapter)}
-                                                   className="inline-block bg-gradient-to-r from-sky-300 to-blue-200 text-white font-bold text-lg py-3 px-10 rounded-full shadow-lg transform transition-all duration-300 hover:scale-110">
-                                                    💠 Đọc chương mới nhất ({latestChapter?.id}) 💠
-                                                </button>
+                                                {latestChapter ? (
+                                                    <button onClick={() => setReadingChapter(latestChapter)}
+                                                       className="inline-block bg-gradient-to-r from-sky-300 to-blue-200 text-white font-bold text-lg py-3 px-10 rounded-full shadow-lg transform transition-all duration-300 hover:scale-110">
+                                                        💠 Đọc mới nhất: {latestChapter.title} 💠
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-gray-500 italic">Đang tải danh sách chương...</span>
+                                                )}
                                             </div>
                                         </section>
                                     </div>
@@ -154,7 +156,7 @@
                                             {isLoading ? (
                                                 <div className="flex justify-center p-10"><div className="loader"></div></div>
                                             ) : (
-                                                chapters.map((ch) => (
+                                                chapters.slice().reverse().map((ch) => (
                                                     <div key={ch.id} onClick={() => { setReadingChapter(ch); window.scrollTo(0,0); }}
                                                        className="cursor-pointer block p-4 bg-blue-50 rounded-xl border border-transparent transition-all duration-300 hover:bg-blue-200 hover:border-blue-400 hover:translate-x-1 shadow-sm">
                                                         <span className="font-bold text-blue-900">{ch.title}</span>
@@ -219,4 +221,3 @@
     </script>
 </body>
 </html>
-
