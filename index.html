@@ -76,26 +76,76 @@
 
             const latestChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
 
+            // Xử lý logic chương trước / sau
+            const currentIndex = readingChapter ? chapters.findIndex(c => c.id === readingChapter.id) : -1;
+            // Giả định chapters được sắp xếp từ cũ đến mới (0 -> N)
+            const prevChapter = currentIndex > 0 ? chapters[currentIndex - 1] : null;
+            const nextChapter = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null;
+
+            const handleChapterChange = (chapter) => {
+                if (chapter) {
+                    setReadingChapter(chapter);
+                    window.scrollTo(0, 0);
+                }
+            };
+
             if (readingChapter) {
                 // LOGIC MỚI: Ưu tiên dùng danh sách tên ảnh thật (images) nếu có
-                // Để đảm bảo hiển thị đúng tên file (ví dụ 001.jpg, 002.jpg)
                 let imageList = [];
                 if (readingChapter.images && readingChapter.images.length > 0) {
                     imageList = readingChapter.images;
                 } else {
-                    // Fallback cho data cũ: Tự tạo tên 001.jpg...
+                    // Fallback cho data cũ
                     imageList = Array.from({length: readingChapter.totalImages}, (_, i) => `${(i+1).toString().padStart(3,'0')}.jpg`);
                 }
 
                 return (
                     <div className="min-h-screen bg-gray-900 font-inter text-white">
-                        <div className="sticky top-0 z-50 flex items-center justify-between p-4 bg-blue-600 shadow-xl">
-                            <button onClick={() => setReadingChapter(null)} className="font-bold flex items-center gap-2 bg-blue-700 px-4 py-2 rounded-lg hover:bg-blue-800">
-                                ⬅ Quay lại
-                            </button>
-                            <h2 className="font-black truncate max-w-[50%]">{readingChapter.title}</h2>
-                            <div className="text-xs opacity-70">{imageList.length} trang</div>
+                        {/* Thanh điều hướng trên cùng */}
+                        <div className="sticky top-0 z-50 bg-blue-600 shadow-xl border-b border-blue-500">
+                            <div className="max-w-4xl mx-auto flex items-center justify-between p-2 sm:p-3 gap-2">
+                                {/* Nút Home */}
+                                <button 
+                                    onClick={() => setReadingChapter(null)} 
+                                    className="flex items-center gap-1 sm:gap-2 bg-blue-700 hover:bg-blue-800 text-white px-3 py-2 rounded-lg font-bold transition-colors shadow-sm"
+                                    title="Về Trang Chủ"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.707 1.5Z"/>
+                                        <path d="m8 3.293 6 6V13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5V9.293l6-6Z"/>
+                                    </svg>
+                                    <span className="hidden sm:inline">Trang Chủ</span>
+                                </button>
+
+                                {/* Tên chương (ở giữa trên mobile) */}
+                                <div className="flex-1 text-center min-w-0 px-2">
+                                    <h2 className="font-bold text-sm sm:text-base truncate">{readingChapter.title}</h2>
+                                    <p className="text-[10px] sm:text-xs opacity-80">{currentIndex + 1}/{chapters.length} • {imageList.length} trang</p>
+                                </div>
+
+                                {/* Nút Điều Hướng Chương */}
+                                <div className="flex items-center gap-1">
+                                    <button 
+                                        onClick={() => handleChapterChange(prevChapter)}
+                                        disabled={!prevChapter}
+                                        className={`px-3 py-2 rounded-lg font-bold transition-colors shadow-sm flex items-center ${prevChapter ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-blue-500/50 text-blue-200 cursor-not-allowed'}`}
+                                        title={prevChapter ? prevChapter.title : "Không có chương trước"}
+                                    >
+                                        ⬅ <span className="hidden sm:inline ml-1">Trước</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleChapterChange(nextChapter)}
+                                        disabled={!nextChapter}
+                                        className={`px-3 py-2 rounded-lg font-bold transition-colors shadow-sm flex items-center ${nextChapter ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-blue-500/50 text-blue-200 cursor-not-allowed'}`}
+                                        title={nextChapter ? nextChapter.title : "Không có chương sau"}
+                                    >
+                                        <span className="hidden sm:inline mr-1">Sau</span> ➡
+                                    </button>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Nội dung truyện */}
                         <div className="max-w-3xl mx-auto bg-black min-h-screen pb-10">
                             {imageList.map((imgName, i) => (
                                 <img key={i} 
@@ -110,8 +160,28 @@
                                 — Hết chương —
                             </div>
                         </div>
-                        <div className="p-10 text-center">
-                            <button onClick={() => { setReadingChapter(null); window.scrollTo(0,0); }} className="bg-blue-500 px-8 py-3 rounded-full font-bold">Về Trang Chủ</button>
+
+                        {/* Footer điều hướng dưới cùng (Thêm vào để tiện bấm khi đọc xong) */}
+                        <div className="p-6 sm:p-10 flex flex-col sm:flex-row justify-center items-center gap-4 bg-gray-800">
+                             <div className="flex gap-4 w-full sm:w-auto justify-center">
+                                <button 
+                                    onClick={() => handleChapterChange(prevChapter)}
+                                    disabled={!prevChapter}
+                                    className={`flex-1 sm:flex-none px-6 py-3 rounded-full font-bold ${prevChapter ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'}`}
+                                >
+                                    ⬅ Chương trước
+                                </button>
+                                <button 
+                                    onClick={() => handleChapterChange(nextChapter)}
+                                    disabled={!nextChapter}
+                                    className={`flex-1 sm:flex-none px-6 py-3 rounded-full font-bold ${nextChapter ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'}`}
+                                >
+                                    Chương sau ➡
+                                </button>
+                             </div>
+                             <button onClick={() => { setReadingChapter(null); window.scrollTo(0,0); }} className="text-blue-400 hover:text-blue-300 font-bold mt-2 sm:mt-0">
+                                 Về danh sách
+                             </button>
                         </div>
                     </div>
                 );
