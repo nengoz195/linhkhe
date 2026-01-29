@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Linh Khế - Spiritpact</title>
+    <title>Linh Khế - Thư Viện Truyện Tranh</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -14,257 +14,240 @@
 
     <style>
         .font-inter { font-family: 'Inter', sans-serif; }
-        .fade-in-section { opacity: 0; transform: translateY(30px); transition: opacity 0.8s ease, transform 0.8s ease; }
-        .fade-in-section.is-visible { opacity: 1; transform: translateY(0); }
         .chapter-list::-webkit-scrollbar { width: 6px; }
         .chapter-list::-webkit-scrollbar-thumb { background-color: #64b5f6; border-radius: 10px; }
         #particle-canvas { max-width: 100%; pointer-events: none; }
-        .glass-card { transition: all 0.3s ease; }
+        .glass-card { transition: all 0.3s ease; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.5); }
+        .comic-tag-card { transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer; }
+        .comic-tag-card:hover { transform: translateY(-5px); }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef } = React;
 
-        // --- CẤU HÌNH ĐÃ FIX (Dùng Raw Github để tránh cache) ---
-        const CONFIG = {
-            // Link gốc đến file data.json (Dạng RAW)
-            BASE_JSON_URL: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data.json', 
-            GITHUB_USER: 'nengoz195',
-            GITHUB_REPO: 'data-truyen-tranh',
-            GITHUB_BRANCH: 'main',
-            COMIC_PATH: 'linh-khe'
-        };
+        const SERIES_DATA = [
+            {
+                id: 'linh-khe-goc',
+                title: "Linh Khế",
+                subTitle: "Spiritpact",
+                poster: "https://lh3.googleusercontent.com/pw/AP1GczNjbo5BXxddIRdCjw5_D_ZlgysBO3-3YHTMiFL-v32MIi51ut2AuP2o6HdNd1bumiaCoCKYiySt41HSllXq8MrctPlWDeJWRU_eTwh1TdIQ7wzX59y6NtBtHOvs2nXkK5gpA3__oEG4N27MScaHlbk=w670-h947-s-no-gm?authuser=0",
+                desc: "Câu chuyện một người một hồn kết thành nhóm mà sống đồng thời cứu vớt thế giới. Một câu chuyện hư cấu dưới bối cảnh thành phố hiện đại về cứu rỗi và cứu rỗi bản thân...",
+                author: "Bình Tử",
+                lastChapterLabel: "Chương 561",
+                lastUpdate: "2 giờ trước",
+                jsonUrl: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data.json',
+                folder: 'linh-khe'
+            },
+            {
+                id: 'nguyet-lac-son-ha',
+                title: "Linh Khế - Lạc Nguyệt Sơn Hà",
+                subTitle: "Tiền truyện cổ đại",
+                poster: "image_353b7a.png",
+                fallbackPoster: "https://st63178.ispot.cc/stories/linh-khe-lac-nguyet-son-ha.jpg",
+                desc: "Câu chuyện nhỏ của hai cụ tổ. Một phần ngoại truyện đặc sắc về quá khứ của các linh sư.",
+                author: "Bình Tử",
+                lastChapterLabel: "Chương 12",
+                lastUpdate: "Vừa xong",
+                jsonUrl: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data_nguyet_lac.json',
+                folder: 'nguyet-lac'
+            }
+        ];
 
         function LinhKheApp() {
+            const [view, setView] = useState('home'); // 'home', 'detail', 'reading'
+            const [selectedSeries, setSelectedSeries] = useState(null);
             const [chapters, setChapters] = useState([]);
-            const [isLoading, setIsLoading] = useState(true);
+            const [isLoading, setIsLoading] = useState(false);
             const [readingChapter, setReadingChapter] = useState(null);
 
-            // Fetch dữ liệu từ JSON
-            useEffect(() => {
-                const loadData = async () => {
-                    try {
-                        // Thêm timestamp (?t=...) để trình duyệt KHÔNG dùng cache cũ
-                        const cacheBuster = `?t=${new Date().getTime()}`;
-                        const url = CONFIG.BASE_JSON_URL + cacheBuster;
-                        
-                        const res = await fetch(url);
-                        if (!res.ok) throw new Error("Không thể tải dữ liệu");
-                        
-                        const data = await res.json();
-                        setChapters(data);
-                    } catch (e) {
-                        console.error("Lỗi tải JSON:", e);
-                    } finally {
-                        setIsLoading(false);
-                    }
-                };
-                loadData();
-            }, []);
+            const handleSelectSeries = async (series) => {
+                setSelectedSeries(series);
+                setView('detail');
+                setIsLoading(true);
+                try {
+                    const cacheBuster = `?t=${new Date().getTime()}`;
+                    const res = await fetch(series.jsonUrl + cacheBuster);
+                    if (!res.ok) throw new Error("Dữ liệu chưa sẵn sàng");
+                    const data = await res.json();
+                    setChapters(data);
+                } catch (e) {
+                    console.error(e);
+                    setChapters([]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
 
-            // FIX LINK ẢNH: Chuyển sang dùng Raw Github thay vì cdn.jsdelivr
             const getImgUrl = (folder, fileName) => {
-                // Mã hóa tên file để tránh lỗi nếu có ký tự lạ
-                const safeFileName = encodeURIComponent(fileName);
-                return `https://raw.githubusercontent.com/${CONFIG.GITHUB_USER}/${CONFIG.GITHUB_REPO}/${CONFIG.GITHUB_BRANCH}/${folder}/${safeFileName}`;
+                return `https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/${folder}/${encodeURIComponent(fileName)}`;
             };
 
             const latestChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
 
-            // Xử lý logic chương trước / sau
-            const currentIndex = readingChapter ? chapters.findIndex(c => c.id === readingChapter.id) : -1;
-            // Giả định chapters được sắp xếp từ cũ đến mới (0 -> N)
-            const prevChapter = currentIndex > 0 ? chapters[currentIndex - 1] : null;
-            const nextChapter = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null;
-
-            const handleChapterChange = (chapter) => {
-                if (chapter) {
-                    setReadingChapter(chapter);
-                    window.scrollTo(0, 0);
-                }
-            };
-
-            if (readingChapter) {
-                // LOGIC MỚI: Ưu tiên dùng danh sách tên ảnh thật (images) nếu có
-                let imageList = [];
-                if (readingChapter.images && readingChapter.images.length > 0) {
-                    imageList = readingChapter.images;
-                } else {
-                    // Fallback cho data cũ
-                    imageList = Array.from({length: readingChapter.totalImages}, (_, i) => `${(i+1).toString().padStart(3,'0')}.jpg`);
-                }
+            // Giao diện ĐỌC TRUYỆN
+            if (view === 'reading' && readingChapter) {
+                const imageList = readingChapter.images || Array.from({length: readingChapter.totalImages}, (_, i) => `${(i+1).toString().padStart(3,'0')}.jpg`);
+                const currentIndex = chapters.findIndex(c => c.id === readingChapter.id);
+                const prev = currentIndex > 0 ? chapters[currentIndex - 1] : null;
+                const next = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null;
 
                 return (
-                    <div className="min-h-screen bg-gray-900 font-inter text-white">
-                        {/* Thanh điều hướng trên cùng */}
-                        <div className="sticky top-0 z-50 bg-blue-600 shadow-xl border-b border-blue-500">
-                            <div className="max-w-4xl mx-auto flex items-center justify-between p-2 sm:p-3 gap-2">
-                                {/* Nút Home */}
-                                <button 
-                                    onClick={() => setReadingChapter(null)} 
-                                    className="flex items-center gap-1 sm:gap-2 bg-blue-700 hover:bg-blue-800 text-white px-3 py-2 rounded-lg font-bold transition-colors shadow-sm"
-                                    title="Về Trang Chủ"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                                        <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.707 1.5Z"/>
-                                        <path d="m8 3.293 6 6V13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5V9.293l6-6Z"/>
-                                    </svg>
-                                    <span className="hidden sm:inline">Trang Chủ</span>
-                                </button>
-
-                                {/* Tên chương (ở giữa trên mobile) */}
-                                <div className="flex-1 text-center min-w-0 px-2">
-                                    <h2 className="font-bold text-sm sm:text-base truncate">{readingChapter.title}</h2>
-                                    <p className="text-[10px] sm:text-xs opacity-80">{currentIndex + 1}/{chapters.length} • {imageList.length} trang</p>
-                                </div>
-
-                                {/* Nút Điều Hướng Chương */}
-                                <div className="flex items-center gap-1">
-                                    <button 
-                                        onClick={() => handleChapterChange(prevChapter)}
-                                        disabled={!prevChapter}
-                                        className={`px-3 py-2 rounded-lg font-bold transition-colors shadow-sm flex items-center ${prevChapter ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-blue-500/50 text-blue-200 cursor-not-allowed'}`}
-                                        title={prevChapter ? prevChapter.title : "Không có chương trước"}
-                                    >
-                                        ⬅ <span className="hidden sm:inline ml-1">Trước</span>
-                                    </button>
-                                    <button 
-                                        onClick={() => handleChapterChange(nextChapter)}
-                                        disabled={!nextChapter}
-                                        className={`px-3 py-2 rounded-lg font-bold transition-colors shadow-sm flex items-center ${nextChapter ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-blue-500/50 text-blue-200 cursor-not-allowed'}`}
-                                        title={nextChapter ? nextChapter.title : "Không có chương sau"}
-                                    >
-                                        <span className="hidden sm:inline mr-1">Sau</span> ➡
-                                    </button>
-                                </div>
+                    <div className="min-h-screen bg-gray-950 text-white font-inter">
+                        <div className="sticky top-0 z-50 bg-blue-600 p-2 sm:p-3 flex items-center justify-between shadow-lg">
+                            <button onClick={() => setView('detail')} className="p-2 bg-blue-700 hover:bg-blue-800 rounded-lg font-bold transition-colors">⬅ Quay lại</button>
+                            <div className="text-center truncate flex-1 px-4">
+                                <h2 className="text-sm font-bold truncate">{readingChapter.title}</h2>
+                                <p className="text-[10px] opacity-70 uppercase tracking-tighter">{selectedSeries.title}</p>
+                            </div>
+                            <div className="flex gap-1">
+                                <button onClick={() => { setReadingChapter(prev); window.scrollTo(0,0); }} disabled={!prev} className={`p-2 rounded-lg font-bold ${prev ? 'bg-blue-700 hover:bg-blue-800' : 'bg-blue-500 opacity-50 cursor-not-allowed'}`}>Trước</button>
+                                <button onClick={() => { setReadingChapter(next); window.scrollTo(0,0); }} disabled={!next} className={`p-2 rounded-lg font-bold ${next ? 'bg-blue-700 hover:bg-blue-800' : 'bg-blue-500 opacity-50 cursor-not-allowed'}`}>Sau</button>
                             </div>
                         </div>
-
-                        {/* Nội dung truyện */}
-                        <div className="max-w-3xl mx-auto bg-black min-h-screen pb-10">
-                            {imageList.map((imgName, i) => (
-                                <img key={i} 
-                                     src={getImgUrl(readingChapter.folder, imgName)} 
-                                     className="w-full h-auto block" 
-                                     loading="lazy" 
-                                     alt={`Trang ${i+1}`} 
-                                     onError={(e) => console.warn("Lỗi tải ảnh:", e.target.src)}
-                                />
+                        <div className="max-w-3xl mx-auto bg-black pb-10">
+                            {imageList.map((img, i) => (
+                                <img key={i} src={getImgUrl(readingChapter.folder, img)} className="w-full h-auto block" loading="lazy" alt={`Trang ${i+1}`} />
                             ))}
-                            <div className="text-center pt-8 pb-4 text-gray-500 text-sm">
-                                — Hết chương —
-                            </div>
+                            <div className="text-center py-10 text-gray-500">— Hết chương —</div>
                         </div>
-
-                        {/* Footer điều hướng dưới cùng (Thêm vào để tiện bấm khi đọc xong) */}
-                        <div className="p-6 sm:p-10 flex flex-col sm:flex-row justify-center items-center gap-4 bg-gray-800">
-                             <div className="flex gap-4 w-full sm:w-auto justify-center">
-                                <button 
-                                    onClick={() => handleChapterChange(prevChapter)}
-                                    disabled={!prevChapter}
-                                    className={`flex-1 sm:flex-none px-6 py-3 rounded-full font-bold ${prevChapter ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'}`}
-                                >
-                                    ⬅ Chương trước
-                                </button>
-                                <button 
-                                    onClick={() => handleChapterChange(nextChapter)}
-                                    disabled={!nextChapter}
-                                    className={`flex-1 sm:flex-none px-6 py-3 rounded-full font-bold ${nextChapter ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'}`}
-                                >
-                                    Chương sau ➡
-                                </button>
-                             </div>
-                             <button onClick={() => { setReadingChapter(null); window.scrollTo(0,0); }} className="text-blue-400 hover:text-blue-300 font-bold mt-2 sm:mt-0">
-                                 Về danh sách
-                             </button>
+                        <div className="p-10 text-center bg-gray-900 border-t border-gray-800">
+                             <button onClick={() => { setView('detail'); window.scrollTo(0,0); }} className="text-blue-400 font-bold hover:text-blue-300">Quay lại mục lục</button>
                         </div>
                     </div>
                 );
             }
 
             return (
-                <div className="linh-khe-wrapper font-inter text-gray-900" style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg,#b3e5fc,#e1f5fe,#bbdefb)', minHeight: '100vh' }}>
+                <div className="linh-khe-wrapper font-inter text-gray-900 min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(160deg,#b3e5fc,#e1f5fe,#bbdefb)' }}>
                     <ParticleBackground />
                     
                     <div className="relative z-10 flex flex-col min-h-screen">
                         {/* Header */}
                         <header className="py-5 shadow-lg bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 m-2 sm:m-4 rounded-2xl text-center">
-                            <h1 className="text-3xl sm:text-4xl font-extrabold text-white drop-shadow-md">🌸 Linh Khế 🌸</h1>
-                            <p className="text-white/90 mt-1 text-sm sm:text-base">Khế ước giữa linh hồn và con người 💙</p>
+                            <h1 className="text-3xl sm:text-4xl font-extrabold text-white drop-shadow-md">🌸 Linh Khế Series 🌸</h1>
                         </header>
 
-                        {/* Main Content */}
-                        <main className="container mx-auto px-3 sm:px-6 py-8 relative z-10 flex-grow">
-                            <div className="grid grid-cols-1 gap-8">
-                                
-                                {/* Poster & Info */}
-                                <div className="fade-in-section is-visible glass-card rounded-2xl shadow-2xl bg-white/70 backdrop-blur-md overflow-hidden border border-white/50">
-                                    <div className="grid grid-cols-1 md:grid-cols-3">
-                                        <div className="md:col-span-1 p-6">
-                                            <img src="https://lh3.googleusercontent.com/pw/AP1GczNjbo5BXxddIRdCjw5_D_ZlgysBO3-3YHTMiFL-v32MIi51ut2AuP2o6HdNd1bumiaCoCKYiySt41HSllXq8MrctPlWDeJWRU_eTwh1TdIQ7wzX59y6NtBtHOvs2nXkK5gpA3__oEG4N27MScaHlbk=w670-h947-s-no-gm?authuser=0"
-                                                 alt="Poster Linh Khế"
-                                                 className="w-full h-auto object-cover rounded-xl shadow-lg transition-transform duration-500 hover:scale-105" />
-                                        </div>
-
-                                        <section id="info" className="md:col-span-2 p-6 sm:p-8 md:border-l border-blue-200/70">
-                                            <h2 className="text-4xl font-black mb-3 text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-indigo-500">Linh Khế (Spiritpact)</h2>
-                                            <p className="text-lg text-gray-700 font-semibold mb-6">Tác giả: Bình Tử</p>
-
-                                            <h3 className="text-2xl font-bold mb-3 text-blue-600">Giới thiệu</h3>
-                                            <p className="text-base text-gray-800 leading-relaxed">
-                                                Câu chuyện một người một hồn kết thành nhóm mà sống đồng thời cứu vớt thế giới. Một câu chuyện hư cấu dưới bối cảnh thành phố hiện đại về cứu rỗi và cứu rỗi bản thân...
-                                            </p>
-                                            <p className="text-base text-gray-800 leading-relaxed mt-4 font-semibold italic">
-                                                Nhân vật chính: Đoan Mộc Hi x Ảnh linh Dương Kính Hoa (Không phân công thụ, người đọc tự xử)
-                                            </p>
-
-                                            <div className="mt-8 text-center">
-                                                {latestChapter ? (
-                                                    <button onClick={() => setReadingChapter(latestChapter)}
-                                                       className="inline-block bg-gradient-to-r from-sky-300 to-blue-200 text-white font-bold text-lg py-3 px-10 rounded-full shadow-lg transform transition-all duration-300 hover:scale-110">
-                                                        💠 Đọc chương mới nhất ({latestChapter.id}) 💠
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-gray-500 italic">Đang tải danh sách chương...</span>
-                                                )}
+                        <main className="container mx-auto px-4 py-6 flex-grow">
+                            {/* TRANG CHỦ: CHỌN TAG */}
+                            {view === 'home' && (
+                                <div className="max-w-4xl mx-auto grid grid-cols-2 gap-6 sm:gap-10 mt-6 animate-fade-in">
+                                    {SERIES_DATA.map(series => (
+                                        <div key={series.id} onClick={() => handleSelectSeries(series)} className="comic-tag-card group">
+                                            <div className="aspect-[3/4.2] rounded-[2rem] overflow-hidden shadow-2xl mb-4 bg-white/50 border-4 border-white">
+                                                <img 
+                                                    src={series.poster} 
+                                                    onError={(e) => { e.target.src = series.fallbackPoster || series.poster; }}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                />
                                             </div>
-                                        </section>
+                                            <h3 className="font-bold text-lg sm:text-2xl text-blue-900 line-clamp-1 px-2 mb-1 group-hover:text-blue-600 transition-colors">{series.title}</h3>
+                                            <div className="flex items-center justify-between px-2">
+                                                <span className="text-xs sm:text-sm text-blue-600 font-bold">{series.lastChapterLabel}</span>
+                                                <div className="flex items-center gap-1 text-gray-500 text-[10px] sm:text-xs">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span>{series.lastUpdate}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* TRANG CHI TIẾT */}
+                            {view === 'detail' && selectedSeries && (
+                                <div className="space-y-6 animate-fade-in">
+                                    <button onClick={() => setView('home')} className="flex items-center gap-2 text-blue-700 font-bold bg-white/60 px-5 py-2 rounded-full hover:bg-white transition-all shadow-sm">
+                                        ⬅ Quay lại thư viện
+                                    </button>
+
+                                    <div className="glass-card rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/50">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                            {/* Poster & Info Left */}
+                                            <div className="md:col-span-1">
+                                                <img src={selectedSeries.poster} 
+                                                     onError={(e) => { e.target.src = selectedSeries.fallbackPoster || selectedSeries.poster; }}
+                                                     className="w-full h-auto rounded-2xl shadow-lg border-2 border-white/50" />
+                                                <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50 text-sm space-y-2">
+                                                    <div className="flex justify-between">
+                                                        <span className="text-blue-500 font-bold">Tác giả:</span>
+                                                        <span className="text-gray-800 font-medium">{selectedSeries.author}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-blue-500 font-bold">Trạng thái:</span>
+                                                        <span className="text-green-600 font-bold">Đang cập nhật</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Info & Chapters Right */}
+                                            <div className="md:col-span-2">
+                                                <h2 className="text-3xl sm:text-4xl font-black text-blue-900 mb-2">{selectedSeries.title}</h2>
+                                                <p className="text-blue-500 font-bold uppercase tracking-widest text-xs mb-6">{selectedSeries.subTitle}</p>
+                                                
+                                                <div className="bg-white/50 p-5 rounded-2xl mb-8 border border-blue-100/30">
+                                                    <h4 className="font-bold text-blue-800 mb-2">Giới thiệu:</h4>
+                                                    <p className="text-gray-800 leading-relaxed italic text-sm sm:text-base">{selectedSeries.desc}</p>
+                                                </div>
+
+                                                {/* NÚT ĐỌC CHƯƠNG MỚI NHẤT (RESTORED) */}
+                                                <div className="mb-10 text-center md:text-left">
+                                                    {latestChapter ? (
+                                                        <button onClick={() => { setReadingChapter(latestChapter); setView('reading'); window.scrollTo(0,0); }}
+                                                           className="inline-flex items-center gap-3 bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-500 hover:to-blue-600 text-white font-black text-lg py-4 px-10 rounded-full shadow-xl transform transition-all duration-300 hover:scale-105 active:scale-95">
+                                                            <span>💠 ĐỌC CHƯƠNG MỚI NHẤT 💠</span>
+                                                            <span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-bold">{latestChapter.id}</span>
+                                                        </button>
+                                                    ) : (
+                                                        <p className="text-gray-500 italic">Đang tải dữ liệu...</p>
+                                                    )}
+                                                </div>
+
+                                                <h3 className="text-2xl font-bold text-blue-800 mb-4 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2"><span>📖</span> Danh sách chương</div>
+                                                    <span className="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full font-bold">
+                                                        {isLoading ? "..." : `${chapters.length} chương`}
+                                                    </span>
+                                                </h3>
+
+                                                {/* DANH SÁCH CHƯƠNG (MỚI NHẤT LÊN ĐẦU) */}
+                                                <div className="chapter-list max-h-[500px] overflow-y-auto pr-2 space-y-3">
+                                                    {isLoading ? (
+                                                        <div className="flex justify-center p-10"><div className="loader"></div></div>
+                                                    ) : chapters.length > 0 ? (
+                                                        chapters.slice().reverse().map(ch => (
+                                                            <div key={ch.id} onClick={() => { setReadingChapter(ch); setView('reading'); window.scrollTo(0,0); }}
+                                                                 className="p-4 bg-white/70 hover:bg-blue-500 hover:text-white rounded-xl cursor-pointer transition-all flex justify-between items-center group shadow-sm border border-transparent hover:border-blue-400">
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-bold text-blue-900 group-hover:text-white transition-colors">{ch.title}</span>
+                                                                    <span className="text-[10px] opacity-60 mt-1">{ch.updatedAt || "Vừa xong"}</span>
+                                                                </div>
+                                                                <span className="text-[10px] font-bold bg-blue-100 text-blue-500 group-hover:bg-white/20 group-hover:text-white px-2 py-1 rounded uppercase tracking-tighter">
+                                                                    {ch.totalImages} trang
+                                                                </span>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-center text-gray-500 py-10 italic">Chưa có dữ liệu chương.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-
-                                {/* Mục lục */}
-                                <aside className="relative">
-                                    <div id="chapters" className="fade-in-section is-visible glass-card rounded-2xl p-6 shadow-xl bg-white/70 backdrop-blur-md border border-white/50">
-                                        <h3 className="text-3xl font-bold mb-6 text-center text-blue-700 uppercase tracking-tighter">Mục Lục 📖</h3>
-
-                                        <nav className="chapter-list max-h-[600px] overflow-y-auto pr-2 space-y-3">
-                                            {isLoading ? (
-                                                <div className="flex justify-center p-10"><div className="loader"></div></div>
-                                            ) : (
-                                                chapters.slice().reverse().map((ch) => (
-                                                    <div key={ch.id} onClick={() => { setReadingChapter(ch); window.scrollTo(0,0); }}
-                                                       className="cursor-pointer block p-4 bg-blue-50 rounded-xl border border-transparent transition-all duration-300 hover:bg-blue-200 hover:border-blue-400 hover:translate-x-1 shadow-sm">
-                                                        <span className="font-bold text-blue-900">{ch.title}</span>
-                                                        <div className="flex justify-between items-center mt-1">
-                                                            <span className="text-xs text-blue-600">Cập nhật: {ch.updatedAt}</span>
-                                                            <span className="text-[10px] bg-blue-100 px-2 py-0.5 rounded-full font-bold text-blue-500 uppercase">{ch.totalImages} trang</span>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </nav>
-                                    </div>
-                                </aside>
-                            </div>
+                            )}
                         </main>
 
-                        <footer className="text-center py-6 mt-10 text-gray-700 text-sm bg-gradient-to-r from-sky-300 to-indigo-300 m-2 sm:m-4 rounded-2xl shadow-md font-bold uppercase tracking-widest">
-                            💙 Giao diện thiết kế bởi Thiên Trường Địa Cửu 💙
+                        <footer className="text-center py-6 text-gray-600 text-[10px] sm:text-xs font-bold uppercase tracking-widest mt-auto opacity-70">
+                            💙 Thư viện Linh Khế • Thiết kế bởi Thiên Trường Địa Cửu 💙
                         </footer>
                     </div>
                 </div>
@@ -281,29 +264,22 @@
                 class P {
                     constructor() {
                         this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height;
-                        this.s = Math.random() * 2 + 1; this.vx = (Math.random()-0.5)*0.4; this.vy = (Math.random()-0.5)*0.4;
+                        this.s = Math.random() * 2 + 1; this.vx = (Math.random()-0.5)*0.3; this.vy = (Math.random()-0.5)*0.3;
                         this.c = `hsl(${Math.random() * 60 + 190}, 100%, ${Math.random() * 40 + 60}%)`;
                     }
                     u() { this.x += this.vx; this.y += this.vy; if(this.x<0||this.x>canvas.width)this.vx*=-1; if(this.y<0||this.y>canvas.height)this.vy*=-1; }
                     d() { ctx.beginPath(); ctx.arc(this.x, this.y, this.s, 0, Math.PI*2); ctx.fillStyle = this.c; ctx.fill(); }
                 }
-                const init = () => { particles = []; for(let i=0; i<70; i++) particles.push(new P()); };
+                const init = () => { particles = []; for(let i=0; i<50; i++) particles.push(new P()); };
                 const loop = () => {
-                    ctx.fillStyle = 'rgba(240,248,255,0.15)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                    ctx.fillStyle = 'rgba(240,248,255,0.12)'; ctx.fillRect(0,0,canvas.width,canvas.height);
                     particles.forEach(p => { p.u(); p.d(); });
-                    for(let i=0; i<particles.length; i++) {
-                        for(let j=i; j<particles.length; j++) {
-                            const d = Math.sqrt((particles[i].x-particles[j].x)**2 + (particles[i].y-particles[j].y)**2);
-                            if(d<120) { ctx.strokeStyle = `rgba(100,181,246,${1-d/120})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(particles[i].x,particles[i].y); ctx.lineTo(particles[j].x,particles[j].y); ctx.stroke(); }
-                        }
-                    }
                     frame = requestAnimationFrame(loop);
                 };
-                window.addEventListener('resize', () => { resize(); init(); });
-                resize(); init(); loop();
-                return () => cancelAnimationFrame(frame);
+                window.addEventListener('resize', resize); resize(); init(); loop();
+                return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(frame); };
             }, []);
-            return <canvas ref={canvasRef} id="particle-canvas" className="absolute top-0 left-0 w-full h-full z-1 opacity-50" />;
+            return <canvas ref={canvasRef} id="particle-canvas" className="absolute top-0 left-0 w-full h-full opacity-40" />;
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
