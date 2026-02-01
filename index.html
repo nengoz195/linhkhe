@@ -47,7 +47,8 @@
                 id: 'nguyet-lac-son-ha',
                 title: "Linh Khế - Lạc Nguyệt Sơn Hà",
                 subTitle: "Tiền truyện cổ đại",
-                poster: "image_353b7a.png",
+                // Đã sửa poster từ file local sang URL online để tránh lỗi hiển thị
+                poster: "https://st63178.ispot.cc/stories/linh-khe-lac-nguyet-son-ha.jpg", 
                 fallbackPoster: "https://st63178.ispot.cc/stories/linh-khe-lac-nguyet-son-ha.jpg",
                 desc: "Câu chuyện nhỏ của hai cụ tổ.",
                 author: "Bình Tử",
@@ -62,9 +63,8 @@
                 fallbackPoster: "https://lh3.googleusercontent.com/pw/AP1GczNjbo5BXxddIRdCjw5_D_ZlgysBO3-3YHTMiFL-v32MIi51ut2AuP2o6HdNd1bumiaCoCKYiySt41HSllXq8MrctPlWDeJWRU_eTwh1TdIQ7wzX59y6NtBtHOvs2nXkK5gpA3__oEG4N27MScaHlbk=w670-h947-s-no-gm?authuser=0",
                 desc: "Tổng hợp những mẩu truyện ngắn, ngoại truyện vui nhộn về cuộc sống của hai nhân vật chính.",
                 author: "Bình Tử",
-                jsonUrl: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data-ngoai-truyen.json', // URL dự kiến
+                jsonUrl: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data-ngoai-truyen.json',
                 folder: 'ngoai-truyen',
-                // Dữ liệu dự phòng (Fallback) khi không tải được JSON
                 fallbackChapters: [
                     {
                         id: "nt-chap-1",
@@ -78,6 +78,38 @@
             }
         ];
 
+        // Component xử lý ảnh thông minh: Tự động thử đuôi png nếu jpg lỗi
+        const SmartImage = ({ src, alt }) => {
+            const [currentSrc, setCurrentSrc] = useState(src);
+            const [hasError, setHasError] = useState(false);
+
+            useEffect(() => {
+                setCurrentSrc(src);
+                setHasError(false);
+            }, [src]);
+
+            const handleError = () => {
+                if (hasError) return; // Đã thử rồi thì dừng
+                
+                // Nếu đang là jpg mà lỗi -> thử chuyển sang png
+                if (currentSrc.includes('.jpg')) {
+                    setHasError(true);
+                    setCurrentSrc(currentSrc.replace('.jpg', '.png'));
+                    // console.log(`Retry with PNG: ${currentSrc}`);
+                }
+            };
+
+            return (
+                <img 
+                    src={currentSrc} 
+                    className="w-full h-auto block min-h-[200px] bg-gray-900" 
+                    loading="lazy" 
+                    onError={handleError}
+                    alt={alt} 
+                />
+            );
+        };
+
         function LinhKheApp() {
             const [view, setView] = useState('home'); // 'home', 'detail', 'reading'
             const [selectedSeries, setSelectedSeries] = useState(null);
@@ -86,26 +118,18 @@
             const [readingChapter, setReadingChapter] = useState(null);
             const [seriesUpdates, setSeriesUpdates] = useState({});
 
-            // Effect: Tự động fetch thông tin (có xử lý lỗi)
             useEffect(() => {
                 const fetchLatestUpdates = async () => {
                     const updates = {};
-                    
                     await Promise.all(SERIES_DATA.map(async (series) => {
                         try {
                             const cacheBuster = `?t=${new Date().getTime()}`;
                             const res = await fetch(series.jsonUrl + cacheBuster);
                             
                             if (!res.ok) {
-                                // Nếu lỗi mạng/404, dùng fallbackChapters nếu có
                                 if (series.fallbackChapters && series.fallbackChapters.length > 0) {
                                     const last = series.fallbackChapters[0];
-                                    updates[series.id] = { 
-                                        chapterLabel: last.title, 
-                                        timeLabel: last.updatedAt, 
-                                        loaded: true,
-                                        isFallback: true 
-                                    };
+                                    updates[series.id] = { chapterLabel: last.title, timeLabel: last.updatedAt, loaded: true, isFallback: true };
                                 } else {
                                     updates[series.id] = { chapterLabel: "Chưa cập nhật", timeLabel: "--", loaded: true };
                                 }
@@ -124,7 +148,6 @@
                                 updates[series.id] = { chapterLabel: "Chưa có chương", timeLabel: "--", loaded: true };
                             }
                         } catch (error) {
-                            // Xử lý lỗi fetch (ví dụ lỗi CORS hoặc sai định dạng)
                             if (series.fallbackChapters) {
                                 const last = series.fallbackChapters[0];
                                 updates[series.id] = { chapterLabel: last.title, timeLabel: last.updatedAt, loaded: true, isFallback: true };
@@ -133,10 +156,8 @@
                             }
                         }
                     }));
-                    
                     setSeriesUpdates(updates);
                 };
-
                 fetchLatestUpdates();
             }, []);
 
@@ -152,7 +173,6 @@
                     setChapters(data);
                 } catch (e) {
                     console.warn(`Không tải được dữ liệu online cho ${series.title}, dùng dữ liệu offline.`);
-                    // Nếu lỗi, dùng fallbackChapters nếu có
                     if (series.fallbackChapters) {
                         setChapters(series.fallbackChapters);
                     } else {
@@ -164,15 +184,17 @@
             };
 
             const getImgUrl = (folder, fileName) => {
-                // Kiểm tra nếu fileName là URL đầy đủ (cho fallback data) thì dùng luôn
                 if (fileName.startsWith('http')) return fileName;
+                // Encode fileName để xử lý các ký tự đặc biệt nếu có
                 return `https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/${folder}/${encodeURIComponent(fileName)}`;
             };
 
             const latestChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
 
             if (view === 'reading' && readingChapter) {
+                // Mặc định tạo list với đuôi .jpg, SmartImage sẽ lo việc fallback sang .png nếu lỗi
                 const imageList = readingChapter.images || Array.from({length: readingChapter.totalImages}, (_, i) => `${(i+1).toString().padStart(3,'0')}.jpg`);
+                
                 const currentIndex = chapters.findIndex(c => c.id === readingChapter.id);
                 const prev = currentIndex > 0 ? chapters[currentIndex - 1] : null;
                 const next = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null;
@@ -192,7 +214,11 @@
                         </div>
                         <div className="max-w-3xl mx-auto bg-black pb-10">
                             {imageList.map((img, i) => (
-                                <img key={i} src={getImgUrl(readingChapter.folder, img)} className="w-full h-auto block" loading="lazy" alt={`Trang ${i+1}`} />
+                                <SmartImage 
+                                    key={i} 
+                                    src={getImgUrl(readingChapter.folder, img)} 
+                                    alt={`Trang ${i+1}`} 
+                                />
                             ))}
                             <div className="text-center py-10 text-gray-500">— Hết chương —</div>
                         </div>
@@ -227,7 +253,7 @@
                                                 <div className="aspect-[3/4.2] rounded-[2rem] overflow-hidden shadow-2xl mb-4 bg-white/50 border-4 border-white relative">
                                                     <img 
                                                         src={series.poster} 
-                                                        onError={(e) => { e.target.src = series.fallbackPoster || series.poster; }}
+                                                        onError={(e) => { e.target.src = series.fallbackPoster || "https://placehold.co/400x600?text=No+Cover"; }}
                                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                                     />
                                                     {!updateInfo.loaded && (
@@ -266,7 +292,7 @@
                                             {/* Poster & Info Left */}
                                             <div className="md:col-span-1">
                                                 <img src={selectedSeries.poster} 
-                                                     onError={(e) => { e.target.src = selectedSeries.fallbackPoster || selectedSeries.poster; }}
+                                                     onError={(e) => { e.target.src = selectedSeries.fallbackPoster || "https://placehold.co/400x600?text=No+Cover"; }}
                                                      className="w-full h-auto rounded-2xl shadow-lg border-2 border-white/50" />
                                                 <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50 text-sm space-y-2">
                                                     <div className="flex justify-between">
