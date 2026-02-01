@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Linh Khế - Thư Viện Truyện Tranh</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -14,19 +14,32 @@
 
     <style>
         .font-inter { font-family: 'Inter', sans-serif; }
-        .chapter-list::-webkit-scrollbar { width: 6px; }
-        .chapter-list::-webkit-scrollbar-thumb { background-color: #64b5f6; border-radius: 10px; }
+        .chapter-list::-webkit-scrollbar { width: 4px; }
+        .chapter-list::-webkit-scrollbar-thumb { background-color: #60a5fa; border-radius: 10px; } /* Blue scrollbar */
         #particle-canvas { max-width: 100%; pointer-events: none; }
-        .glass-card { transition: all 0.3s ease; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.5); }
+        
+        /* Glass effect with Blue tint */
+        .glass-card { 
+            transition: all 0.3s ease; 
+            background: rgba(255, 255, 255, 0.9); 
+            backdrop-filter: blur(16px); 
+            border: 1px solid rgba(191, 219, 254, 0.6); 
+            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.1);
+        }
+        
         .comic-tag-card { transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer; }
-        .comic-tag-card:hover { transform: translateY(-5px); }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        .comic-tag-card:hover { transform: translateY(-3px); }
+        .loader { border: 3px solid #e0f2fe; border-top: 3px solid #2563eb; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Mobile optimize */
+        body { -webkit-tap-highlight-color: transparent; }
+        .text-shadow-sm { text-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     </style>
 </head>
-<body>
+<body class="bg-blue-50">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -47,7 +60,6 @@
                 id: 'nguyet-lac-son-ha',
                 title: "Linh Khế - Lạc Nguyệt Sơn Hà",
                 subTitle: "Tiền truyện cổ đại",
-                // Đã sửa poster từ file local sang URL online để tránh lỗi hiển thị
                 poster: "https://st63178.ispot.cc/stories/linh-khe-lac-nguyet-son-ha.jpg", 
                 fallbackPoster: "https://st63178.ispot.cc/stories/linh-khe-lac-nguyet-son-ha.jpg",
                 desc: "Câu chuyện nhỏ của hai cụ tổ.",
@@ -78,24 +90,17 @@
             }
         ];
 
-        // Component xử lý ảnh thông minh: Tự động thử đuôi png nếu jpg lỗi
         const SmartImage = ({ src, alt }) => {
             const [currentSrc, setCurrentSrc] = useState(src);
             const [hasError, setHasError] = useState(false);
 
-            useEffect(() => {
-                setCurrentSrc(src);
-                setHasError(false);
-            }, [src]);
+            useEffect(() => { setCurrentSrc(src); setHasError(false); }, [src]);
 
             const handleError = () => {
-                if (hasError) return; // Đã thử rồi thì dừng
-                
-                // Nếu đang là jpg mà lỗi -> thử chuyển sang png
+                if (hasError) return; 
                 if (currentSrc.includes('.jpg')) {
                     setHasError(true);
                     setCurrentSrc(currentSrc.replace('.jpg', '.png'));
-                    // console.log(`Retry with PNG: ${currentSrc}`);
                 }
             };
 
@@ -111,7 +116,7 @@
         };
 
         function LinhKheApp() {
-            const [view, setView] = useState('home'); // 'home', 'detail', 'reading'
+            const [view, setView] = useState('home');
             const [selectedSeries, setSelectedSeries] = useState(null);
             const [chapters, setChapters] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
@@ -172,12 +177,8 @@
                     const data = await res.json();
                     setChapters(data);
                 } catch (e) {
-                    console.warn(`Không tải được dữ liệu online cho ${series.title}, dùng dữ liệu offline.`);
-                    if (series.fallbackChapters) {
-                        setChapters(series.fallbackChapters);
-                    } else {
-                        setChapters([]);
-                    }
+                    if (series.fallbackChapters) setChapters(series.fallbackChapters);
+                    else setChapters([]);
                 } finally {
                     setIsLoading(false);
                 }
@@ -185,93 +186,121 @@
 
             const getImgUrl = (folder, fileName) => {
                 if (fileName.startsWith('http')) return fileName;
-                // Encode fileName để xử lý các ký tự đặc biệt nếu có
                 return `https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/${folder}/${encodeURIComponent(fileName)}`;
             };
 
             const latestChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
 
             if (view === 'reading' && readingChapter) {
-                // Mặc định tạo list với đuôi .jpg, SmartImage sẽ lo việc fallback sang .png nếu lỗi
                 const imageList = readingChapter.images || Array.from({length: readingChapter.totalImages}, (_, i) => `${(i+1).toString().padStart(3,'0')}.jpg`);
-                
                 const currentIndex = chapters.findIndex(c => c.id === readingChapter.id);
                 const prev = currentIndex > 0 ? chapters[currentIndex - 1] : null;
                 const next = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null;
 
                 return (
-                    <div className="min-h-screen bg-gray-950 text-white font-inter">
-                        <div className="sticky top-0 z-50 bg-blue-600 p-2 sm:p-3 flex items-center justify-between shadow-lg">
-                            <button onClick={() => setView('detail')} className="p-2 bg-blue-700 hover:bg-blue-800 rounded-lg font-bold transition-colors">⬅ Quay lại</button>
-                            <div className="text-center truncate flex-1 px-4">
-                                <h2 className="text-sm font-bold truncate">{readingChapter.title}</h2>
-                                <p className="text-[10px] opacity-70 uppercase tracking-tighter">{selectedSeries.title}</p>
+                    <div className="min-h-screen bg-gray-950 text-white font-inter pb-safe">
+                        {/* Compact Header for Mobile with Blue Accent */}
+                        <div className="sticky top-0 z-50 bg-gradient-to-r from-blue-900 to-slate-900 border-b border-blue-800 p-2 flex items-center justify-between shadow-xl">
+                            <button onClick={() => setView('detail')} className="p-2 text-blue-200 hover:text-white active:scale-95 transition-transform">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                            </button>
+                            
+                            <div className="flex-1 px-2 min-w-0 text-center">
+                                <h2 className="text-sm font-bold truncate text-blue-50">{readingChapter.title}</h2>
+                                <p className="text-[10px] text-blue-300 truncate hidden sm:block">{selectedSeries.title}</p>
                             </div>
-                            <div className="flex gap-1">
-                                <button onClick={() => { setReadingChapter(prev); window.scrollTo(0,0); }} disabled={!prev} className={`p-2 rounded-lg font-bold ${prev ? 'bg-blue-700 hover:bg-blue-800' : 'bg-blue-500 opacity-50 cursor-not-allowed'}`}>Trước</button>
-                                <button onClick={() => { setReadingChapter(next); window.scrollTo(0,0); }} disabled={!next} className={`p-2 rounded-lg font-bold ${next ? 'bg-blue-700 hover:bg-blue-800' : 'bg-blue-500 opacity-50 cursor-not-allowed'}`}>Sau</button>
+
+                            <div className="flex items-center gap-1">
+                                <button 
+                                    onClick={() => { setReadingChapter(prev); window.scrollTo(0,0); }} 
+                                    disabled={!prev} 
+                                    className={`p-2 rounded-lg transition-colors ${prev ? 'text-blue-400 hover:bg-white/10' : 'text-gray-600 cursor-not-allowed'}`}
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                                </button>
+                                <button 
+                                    onClick={() => { setReadingChapter(next); window.scrollTo(0,0); }} 
+                                    disabled={!next} 
+                                    className={`p-2 rounded-lg transition-colors ${next ? 'text-blue-400 hover:bg-white/10' : 'text-gray-600 cursor-not-allowed'}`}
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                </button>
                             </div>
                         </div>
-                        <div className="max-w-3xl mx-auto bg-black pb-10">
+
+                        <div className="max-w-3xl mx-auto bg-black min-h-[50vh]">
                             {imageList.map((img, i) => (
-                                <SmartImage 
-                                    key={i} 
-                                    src={getImgUrl(readingChapter.folder, img)} 
-                                    alt={`Trang ${i+1}`} 
-                                />
+                                <SmartImage key={i} src={getImgUrl(readingChapter.folder, img)} alt={`Trang ${i+1}`} />
                             ))}
-                            <div className="text-center py-10 text-gray-500">— Hết chương —</div>
+                            <div className="py-12 text-center text-blue-300/50 text-sm">
+                                <div>— Bạn đã đọc hết chương —</div>
+                                <div className="mt-2 text-xs opacity-60">Chạm vào nút Mũi tên để chuyển chương</div>
+                            </div>
                         </div>
-                        <div className="p-10 text-center bg-gray-900 border-t border-gray-800">
-                             <button onClick={() => { setView('detail'); window.scrollTo(0,0); }} className="text-blue-400 font-bold hover:text-blue-300">Quay lại mục lục</button>
+
+                        {/* Bottom Navigation for easier reach */}
+                         <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-blue-900/50 p-3 flex justify-center sm:hidden">
+                             <button onClick={() => { setView('detail'); window.scrollTo(0,0); }} className="px-6 py-2 bg-blue-700/20 rounded-full text-sm font-bold text-blue-200 hover:text-white border border-blue-700/50">
+                                 Danh sách chương
+                             </button>
                         </div>
+                        <div className="h-16 sm:h-0"></div>
                     </div>
                 );
             }
 
             return (
-                <div className="linh-khe-wrapper font-inter text-gray-900 min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(160deg,#b3e5fc,#e1f5fe,#bbdefb)' }}>
+                // Restoration of the Vibrant Gradient Background
+                <div className="linh-khe-wrapper font-inter text-gray-900 min-h-screen relative overflow-x-hidden" style={{ background: 'linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 50%, #a5b4fc 100%)' }}>
                     <ParticleBackground />
                     
                     <div className="relative z-10 flex flex-col min-h-screen">
-                        {/* Header */}
-                        <header className="py-5 shadow-lg bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 m-2 sm:m-4 rounded-2xl text-center">
-                            <h1 className="text-3xl sm:text-4xl font-extrabold text-white drop-shadow-md">🌸 Linh Khế Series 🌸</h1>
+                        {/* Vibrant Header restored */}
+                        <header className="px-4 py-3 sm:py-5 sticky top-0 z-30">
+                            <div className="max-w-4xl mx-auto bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 shadow-lg shadow-blue-300/50 rounded-2xl p-3 flex items-center justify-between sm:justify-center relative">
+                                {view === 'detail' && (
+                                    <button onClick={() => setView('home')} className="p-1 text-white hover:bg-white/20 rounded-full md:hidden absolute left-3">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                                    </button>
+                                )}
+                                <h1 className="text-lg sm:text-2xl font-black text-white text-center w-full sm:w-auto drop-shadow-md cursor-pointer" onClick={() => setView('home')}>
+                                    KHẾ ƯỚC LINH HỒN
+                                </h1>
+                            </div>
                         </header>
 
-                        <main className="container mx-auto px-4 py-6 flex-grow">
-                            {/* TRANG CHỦ */}
+                        <main className="container mx-auto px-3 sm:px-4 py-2 sm:py-6 flex-grow max-w-6xl">
+                            {/* HOME VIEW */}
                             {view === 'home' && (
-                                <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-10 mt-6 animate-fade-in">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-8 animate-fade-in mt-2">
                                     {SERIES_DATA.map(series => {
                                         const updateInfo = seriesUpdates[series.id] || {};
-                                        const chapterLabel = updateInfo.loaded ? updateInfo.chapterLabel : "Đang tải...";
-                                        const timeLabel = updateInfo.loaded ? updateInfo.timeLabel : "...";
-
+                                        
                                         return (
-                                            <div key={series.id} onClick={() => handleSelectSeries(series)} className="comic-tag-card group">
-                                                <div className="aspect-[3/4.2] rounded-[2rem] overflow-hidden shadow-2xl mb-4 bg-white/50 border-4 border-white relative">
-                                                    <img 
-                                                        src={series.poster} 
-                                                        onError={(e) => { e.target.src = series.fallbackPoster || "https://placehold.co/400x600?text=No+Cover"; }}
-                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                    />
-                                                    {!updateInfo.loaded && (
-                                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                                                            <div className="loader !w-6 !h-6 !border-2"></div>
+                                            <div key={series.id} onClick={() => handleSelectSeries(series)} className="bg-white/90 backdrop-blur rounded-2xl shadow-md shadow-blue-200/50 border-2 border-blue-100 overflow-hidden active:scale-98 transition-all hover:border-blue-300 hover:shadow-xl cursor-pointer">
+                                                <div className="flex sm:flex-col h-32 sm:h-auto">
+                                                    {/* Poster with better sizing */}
+                                                    <div className="w-24 sm:w-full shrink-0 sm:aspect-[3/4.2] relative bg-blue-50">
+                                                        <img 
+                                                            src={series.poster} 
+                                                            onError={(e) => { e.target.src = series.fallbackPoster || "https://placehold.co/400x600?text=No+Cover"; }}
+                                                            className="w-full h-full object-cover absolute inset-0"
+                                                        />
+                                                    </div>
+                                                    {/* Content with Blue Accents */}
+                                                    <div className="flex-1 p-3 sm:p-4 flex flex-col justify-center sm:justify-start min-w-0">
+                                                        <h3 className="font-bold text-base sm:text-xl text-blue-900 line-clamp-1 mb-1">{series.title}</h3>
+                                                        <p className="text-xs text-blue-500/80 font-semibold uppercase tracking-wider line-clamp-1 mb-2 sm:mb-4">{series.subTitle}</p>
+                                                        
+                                                        <div className="mt-auto flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                                            <div className="text-xs font-bold text-white bg-blue-500 px-2 py-1 rounded-md shadow-sm w-fit truncate max-w-full">
+                                                                {updateInfo.loaded ? updateInfo.chapterLabel : "..."}
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-500 flex items-center gap-1 mt-1 sm:mt-0">
+                                                                <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                                {updateInfo.loaded ? updateInfo.timeLabel : "..."}
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                </div>
-                                                <h3 className="font-bold text-lg sm:text-2xl text-blue-900 line-clamp-1 px-2 mb-1 group-hover:text-blue-600 transition-colors">{series.title}</h3>
-                                                <div className="flex items-center justify-between px-2">
-                                                    <span className={`text-xs sm:text-sm font-bold ${updateInfo.loaded ? 'text-blue-600' : 'text-gray-400'}`}>
-                                                        {chapterLabel}
-                                                    </span>
-                                                    <div className="flex items-center gap-1 text-gray-500 text-[10px] sm:text-xs">
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                        <span>{timeLabel}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -280,82 +309,82 @@
                                 </div>
                             )}
 
-                            {/* TRANG CHI TIẾT */}
+                            {/* DETAIL VIEW */}
                             {view === 'detail' && selectedSeries && (
-                                <div className="space-y-6 animate-fade-in">
-                                    <button onClick={() => setView('home')} className="flex items-center gap-2 text-blue-700 font-bold bg-white/60 px-5 py-2 rounded-full hover:bg-white transition-all shadow-sm">
-                                        ⬅ Quay lại thư viện
+                                <div className="animate-fade-in pb-10">
+                                    <button onClick={() => setView('home')} className="hidden md:flex items-center gap-2 text-blue-700 font-bold bg-white/50 px-4 py-2 rounded-full hover:bg-white transition-all mb-4 w-fit shadow-sm">
+                                        ⬅ Quay lại
                                     </button>
 
-                                    <div className="glass-card rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/50">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                            {/* Poster & Info Left */}
-                                            <div className="md:col-span-1">
-                                                <img src={selectedSeries.poster} 
-                                                     onError={(e) => { e.target.src = selectedSeries.fallbackPoster || "https://placehold.co/400x600?text=No+Cover"; }}
-                                                     className="w-full h-auto rounded-2xl shadow-lg border-2 border-white/50" />
-                                                <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50 text-sm space-y-2">
-                                                    <div className="flex justify-between">
-                                                        <span className="text-blue-500 font-bold">Tác giả:</span>
-                                                        <span className="text-gray-800 font-medium">{selectedSeries.author}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-blue-500 font-bold">Trạng thái:</span>
-                                                        <span className="text-green-600 font-bold">Đang cập nhật</span>
-                                                    </div>
+                                    <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-8">
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8">
+                                            {/* Poster */}
+                                            <div className="md:col-span-4 lg:col-span-3 flex justify-center md:block">
+                                                <div className="w-2/3 sm:w-3/5 md:w-full rounded-xl sm:rounded-2xl shadow-xl shadow-blue-500/20 rotate-0 md:-rotate-2 border-[4px] border-white overflow-hidden bg-gray-200 relative group">
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-blue-900/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                                    <img src={selectedSeries.poster} 
+                                                         onError={(e) => { e.target.src = selectedSeries.fallbackPoster || "https://placehold.co/400x600?text=No+Cover"; }}
+                                                         className="w-full h-auto object-cover" />
                                                 </div>
                                             </div>
 
-                                            {/* Info & Chapters Right */}
-                                            <div className="md:col-span-2">
-                                                <h2 className="text-3xl sm:text-4xl font-black text-blue-900 mb-2">{selectedSeries.title}</h2>
-                                                <p className="text-blue-500 font-bold uppercase tracking-widest text-xs mb-6">{selectedSeries.subTitle}</p>
+                                            {/* Info */}
+                                            <div className="md:col-span-8 lg:col-span-9 flex flex-col">
+                                                <div className="text-center md:text-left mb-4">
+                                                    <h2 className="text-2xl sm:text-4xl font-black text-blue-900 leading-tight drop-shadow-sm">{selectedSeries.title}</h2>
+                                                    <p className="text-blue-500 font-bold uppercase tracking-widest text-xs mt-1 bg-blue-50 inline-block px-2 py-1 rounded">{selectedSeries.subTitle}</p>
+                                                </div>
                                                 
-                                                <div className="bg-white/50 p-5 rounded-2xl mb-8 border border-blue-100/30">
-                                                    <h4 className="font-bold text-blue-800 mb-2">Giới thiệu:</h4>
-                                                    <p className="text-gray-800 leading-relaxed italic text-sm sm:text-base">{selectedSeries.desc}</p>
+                                                <div className="bg-blue-50/50 p-4 rounded-xl mb-6 text-sm border border-blue-100 shadow-inner">
+                                                    <p className="text-gray-800 leading-relaxed line-clamp-4 md:line-clamp-none font-medium" onClick={(e) => e.target.classList.toggle('line-clamp-4')}>
+                                                        {selectedSeries.desc}
+                                                    </p>
+                                                    <div className="mt-3 flex gap-4 text-xs font-bold text-gray-500 border-t border-blue-200 pt-2">
+                                                        <span>Tác giả: <span className="text-blue-700">{selectedSeries.author}</span></span>
+                                                        <span className="text-green-600 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Đang tiến hành</span>
+                                                    </div>
                                                 </div>
 
-                                                <div className="mb-10 text-center md:text-left">
+                                                <div className="mb-6">
                                                     {latestChapter ? (
                                                         <button onClick={() => { setReadingChapter(latestChapter); setView('reading'); window.scrollTo(0,0); }}
-                                                           className="inline-flex items-center gap-3 bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-500 hover:to-blue-600 text-white font-black text-lg py-4 px-10 rounded-full shadow-xl transform transition-all duration-300 hover:scale-105 active:scale-95">
-                                                            <span>💠 ĐỌC CHƯƠNG MỚI NHẤT 💠</span>
-                                                            <span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-bold">{latestChapter.title}</span>
+                                                           className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-base sm:text-lg py-3 px-8 rounded-full shadow-lg shadow-blue-400/40 transition-all transform active:scale-95 border border-white/20">
+                                                            <span>Đọc tập mới nhất</span>
+                                                            <span className="bg-white/20 px-2 py-0.5 rounded text-sm font-mono">{latestChapter.title.replace(selectedSeries.title, '').trim() || latestChapter.title}</span>
                                                         </button>
                                                     ) : (
-                                                        <button disabled className="bg-gray-400 text-white font-bold py-4 px-10 rounded-full shadow-inner cursor-not-allowed">
-                                                            Chưa có chương mới
+                                                        <button disabled className="w-full sm:w-auto bg-gray-300 text-white font-bold py-3 px-6 rounded-xl cursor-not-allowed">
+                                                            Chưa có chương
                                                         </button>
                                                     )}
                                                 </div>
 
-                                                <h3 className="text-2xl font-bold text-blue-800 mb-4 flex items-center justify-between">
-                                                    <div className="flex items-center gap-2"><span>📖</span> Danh sách chương</div>
-                                                    <span className="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full font-bold">
-                                                        {isLoading ? "..." : `${chapters.length} chương`}
-                                                    </span>
-                                                </h3>
+                                                <div className="flex-1 flex flex-col min-h-0">
+                                                    <h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center justify-between">
+                                                        <span className="flex items-center gap-2">📂 Danh sách chương</span>
+                                                        <span className="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full">{chapters.length} tập</span>
+                                                    </h3>
 
-                                                <div className="chapter-list max-h-[500px] overflow-y-auto pr-2 space-y-3">
-                                                    {isLoading ? (
-                                                        <div className="flex justify-center p-10"><div className="loader"></div></div>
-                                                    ) : chapters.length > 0 ? (
-                                                        chapters.slice().reverse().map(ch => (
-                                                            <div key={ch.id} onClick={() => { setReadingChapter(ch); setView('reading'); window.scrollTo(0,0); }}
-                                                                 className="p-4 bg-white/70 hover:bg-blue-500 hover:text-white rounded-xl cursor-pointer transition-all flex justify-between items-center group shadow-sm border border-transparent hover:border-blue-400">
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-bold text-blue-900 group-hover:text-white transition-colors">{ch.title}</span>
-                                                                    <span className="text-[10px] opacity-60 mt-1">{ch.updatedAt || "Vừa xong"}</span>
+                                                    <div className="chapter-list flex-1 overflow-y-auto pr-1 -mr-1 space-y-2 max-h-[50vh] sm:max-h-[400px]">
+                                                        {isLoading ? (
+                                                            <div className="flex justify-center p-8"><div className="loader"></div></div>
+                                                        ) : chapters.length > 0 ? (
+                                                            chapters.slice().reverse().map(ch => (
+                                                                <div key={ch.id} onClick={() => { setReadingChapter(ch); setView('reading'); window.scrollTo(0,0); }}
+                                                                     className="p-3 bg-white hover:bg-blue-500 hover:text-white rounded-lg cursor-pointer transition-colors flex justify-between items-center group border border-blue-100 hover:border-blue-400 shadow-sm">
+                                                                    <div className="flex flex-col min-w-0 pr-2">
+                                                                        <span className="font-bold text-sm text-gray-800 truncate group-hover:text-white">{ch.title}</span>
+                                                                        <span className="text-[10px] text-gray-400 group-hover:text-blue-100">{ch.updatedAt || "N/A"}</span>
+                                                                    </div>
+                                                                    <div className="shrink-0">
+                                                                         <svg className="w-5 h-5 text-blue-200 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                                                    </div>
                                                                 </div>
-                                                                <span className="text-[10px] font-bold bg-blue-100 text-blue-500 group-hover:bg-white/20 group-hover:text-white px-2 py-1 rounded uppercase tracking-tighter">
-                                                                    {ch.totalImages || "?"} trang
-                                                                </span>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <p className="text-center text-gray-500 py-10 italic">Chưa có dữ liệu chương.</p>
-                                                    )}
+                                                            ))
+                                                        ) : (
+                                                            <div className="text-center text-gray-400 py-8 text-sm italic">Đang cập nhật danh sách...</div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -363,10 +392,12 @@
                                 </div>
                             )}
                         </main>
-
-                        <footer className="text-center py-6 text-gray-600 text-[10px] sm:text-xs font-bold uppercase tracking-widest mt-auto opacity-70">
-                            💙 Thư viện Linh Khế • Thiết kế bởi Thiên Trường Địa Cửu 💙
-                        </footer>
+                        
+                        {view === 'home' && (
+                             <footer className="text-center py-6 text-blue-700/50 text-[10px] font-bold uppercase tracking-widest mt-auto">
+                                💙 Thư viện Linh Khế 💙
+                            </footer>
+                        )}
                     </div>
                 </div>
             );
@@ -388,16 +419,16 @@
                     u() { this.x += this.vx; this.y += this.vy; if(this.x<0||this.x>canvas.width)this.vx*=-1; if(this.y<0||this.y>canvas.height)this.vy*=-1; }
                     d() { ctx.beginPath(); ctx.arc(this.x, this.y, this.s, 0, Math.PI*2); ctx.fillStyle = this.c; ctx.fill(); }
                 }
-                const init = () => { particles = []; for(let i=0; i<50; i++) particles.push(new P()); };
+                const init = () => { particles = []; for(let i=0; i<30; i++) particles.push(new P()); }; 
                 const loop = () => {
-                    ctx.fillStyle = 'rgba(240,248,255,0.12)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                    ctx.clearRect(0,0,canvas.width,canvas.height); 
                     particles.forEach(p => { p.u(); p.d(); });
                     frame = requestAnimationFrame(loop);
                 };
                 window.addEventListener('resize', resize); resize(); init(); loop();
                 return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(frame); };
             }, []);
-            return <canvas ref={canvasRef} id="particle-canvas" className="absolute top-0 left-0 w-full h-full opacity-40" />;
+            return <canvas ref={canvasRef} id="particle-canvas" className="absolute top-0 left-0 w-full h-full opacity-60" />;
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
