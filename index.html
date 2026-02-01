@@ -53,6 +53,28 @@
                 author: "Bình Tử",
                 jsonUrl: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data-lnsh.json',
                 folder: 'nguyet-lac'
+            },
+            {
+                id: 'linh-khe-ngoai-truyen',
+                title: "Linh Khế - Ngoại Truyện",
+                subTitle: "Extra Stories",
+                poster: "https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/poster-nt.jpg",
+                fallbackPoster: "https://lh3.googleusercontent.com/pw/AP1GczNjbo5BXxddIRdCjw5_D_ZlgysBO3-3YHTMiFL-v32MIi51ut2AuP2o6HdNd1bumiaCoCKYiySt41HSllXq8MrctPlWDeJWRU_eTwh1TdIQ7wzX59y6NtBtHOvs2nXkK5gpA3__oEG4N27MScaHlbk=w670-h947-s-no-gm?authuser=0",
+                desc: "Tổng hợp những mẩu truyện ngắn, ngoại truyện vui nhộn về cuộc sống của hai nhân vật chính.",
+                author: "Bình Tử",
+                jsonUrl: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data-ngoai-truyen.json', // URL dự kiến
+                folder: 'ngoai-truyen',
+                // Dữ liệu dự phòng (Fallback) khi không tải được JSON
+                fallbackChapters: [
+                    {
+                        id: "nt-chap-1",
+                        title: "Ngoại Truyện: Một ngày bình yên",
+                        updatedAt: "Mới cập nhật",
+                        totalImages: 0,
+                        folder: "ngoai-truyen",
+                        images: ["https://placehold.co/600x800?text=Trang+1", "https://placehold.co/600x800?text=Trang+2"]
+                    }
+                ]
             }
         ];
 
@@ -62,24 +84,35 @@
             const [chapters, setChapters] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
             const [readingChapter, setReadingChapter] = useState(null);
-            
-            // State mới để lưu thông tin cập nhật tự động cho từng truyện
             const [seriesUpdates, setSeriesUpdates] = useState({});
 
-            // Effect để tự động fetch thông tin mới nhất cho trang chủ
+            // Effect: Tự động fetch thông tin (có xử lý lỗi)
             useEffect(() => {
                 const fetchLatestUpdates = async () => {
                     const updates = {};
                     
                     await Promise.all(SERIES_DATA.map(async (series) => {
                         try {
-                            // Thêm timestamp để tránh cache trình duyệt
                             const cacheBuster = `?t=${new Date().getTime()}`;
                             const res = await fetch(series.jsonUrl + cacheBuster);
-                            if (!res.ok) throw new Error("Network response was not ok");
+                            
+                            if (!res.ok) {
+                                // Nếu lỗi mạng/404, dùng fallbackChapters nếu có
+                                if (series.fallbackChapters && series.fallbackChapters.length > 0) {
+                                    const last = series.fallbackChapters[0];
+                                    updates[series.id] = { 
+                                        chapterLabel: last.title, 
+                                        timeLabel: last.updatedAt, 
+                                        loaded: true,
+                                        isFallback: true 
+                                    };
+                                } else {
+                                    updates[series.id] = { chapterLabel: "Chưa cập nhật", timeLabel: "--", loaded: true };
+                                }
+                                return;
+                            }
                             
                             const data = await res.json();
-                            
                             if (data && data.length > 0) {
                                 const lastChapter = data[data.length - 1];
                                 updates[series.id] = {
@@ -91,8 +124,13 @@
                                 updates[series.id] = { chapterLabel: "Chưa có chương", timeLabel: "--", loaded: true };
                             }
                         } catch (error) {
-                            console.error(`Lỗi tải dữ liệu cho ${series.title}:`, error);
-                            updates[series.id] = { chapterLabel: "Lỗi tải", timeLabel: "Thử lại sau", loaded: true };
+                            // Xử lý lỗi fetch (ví dụ lỗi CORS hoặc sai định dạng)
+                            if (series.fallbackChapters) {
+                                const last = series.fallbackChapters[0];
+                                updates[series.id] = { chapterLabel: last.title, timeLabel: last.updatedAt, loaded: true, isFallback: true };
+                            } else {
+                                updates[series.id] = { chapterLabel: "Lỗi tải", timeLabel: "Thử lại sau", loaded: true };
+                            }
                         }
                     }));
                     
@@ -109,24 +147,30 @@
                 try {
                     const cacheBuster = `?t=${new Date().getTime()}`;
                     const res = await fetch(series.jsonUrl + cacheBuster);
-                    if (!res.ok) throw new Error("Dữ liệu chưa sẵn sàng");
+                    if (!res.ok) throw new Error("Fetch failed");
                     const data = await res.json();
                     setChapters(data);
                 } catch (e) {
-                    console.error(e);
-                    setChapters([]);
+                    console.warn(`Không tải được dữ liệu online cho ${series.title}, dùng dữ liệu offline.`);
+                    // Nếu lỗi, dùng fallbackChapters nếu có
+                    if (series.fallbackChapters) {
+                        setChapters(series.fallbackChapters);
+                    } else {
+                        setChapters([]);
+                    }
                 } finally {
                     setIsLoading(false);
                 }
             };
 
             const getImgUrl = (folder, fileName) => {
+                // Kiểm tra nếu fileName là URL đầy đủ (cho fallback data) thì dùng luôn
+                if (fileName.startsWith('http')) return fileName;
                 return `https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/${folder}/${encodeURIComponent(fileName)}`;
             };
 
             const latestChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
 
-            // Giao diện ĐỌC TRUYỆN
             if (view === 'reading' && readingChapter) {
                 const imageList = readingChapter.images || Array.from({length: readingChapter.totalImages}, (_, i) => `${(i+1).toString().padStart(3,'0')}.jpg`);
                 const currentIndex = chapters.findIndex(c => c.id === readingChapter.id);
@@ -170,11 +214,10 @@
                         </header>
 
                         <main className="container mx-auto px-4 py-6 flex-grow">
-                            {/* TRANG CHỦ: CHỌN TAG */}
+                            {/* TRANG CHỦ */}
                             {view === 'home' && (
-                                <div className="max-w-4xl mx-auto grid grid-cols-2 gap-6 sm:gap-10 mt-6 animate-fade-in">
+                                <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-10 mt-6 animate-fade-in">
                                     {SERIES_DATA.map(series => {
-                                        // Lấy dữ liệu động từ state
                                         const updateInfo = seriesUpdates[series.id] || {};
                                         const chapterLabel = updateInfo.loaded ? updateInfo.chapterLabel : "Đang tải...";
                                         const timeLabel = updateInfo.loaded ? updateInfo.timeLabel : "...";
@@ -187,7 +230,6 @@
                                                         onError={(e) => { e.target.src = series.fallbackPoster || series.poster; }}
                                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                                     />
-                                                    {/* Badge trạng thái loading nếu chưa tải xong */}
                                                     {!updateInfo.loaded && (
                                                         <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                                                             <div className="loader !w-6 !h-6 !border-2"></div>
@@ -248,16 +290,17 @@
                                                     <p className="text-gray-800 leading-relaxed italic text-sm sm:text-base">{selectedSeries.desc}</p>
                                                 </div>
 
-                                                {/* NÚT ĐỌC CHƯƠNG MỚI NHẤT (RESTORED) */}
                                                 <div className="mb-10 text-center md:text-left">
                                                     {latestChapter ? (
                                                         <button onClick={() => { setReadingChapter(latestChapter); setView('reading'); window.scrollTo(0,0); }}
                                                            className="inline-flex items-center gap-3 bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-500 hover:to-blue-600 text-white font-black text-lg py-4 px-10 rounded-full shadow-xl transform transition-all duration-300 hover:scale-105 active:scale-95">
                                                             <span>💠 ĐỌC CHƯƠNG MỚI NHẤT 💠</span>
-                                                            <span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-bold">{latestChapter.id}</span>
+                                                            <span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-bold">{latestChapter.title}</span>
                                                         </button>
                                                     ) : (
-                                                        <p className="text-gray-500 italic">Đang tải dữ liệu...</p>
+                                                        <button disabled className="bg-gray-400 text-white font-bold py-4 px-10 rounded-full shadow-inner cursor-not-allowed">
+                                                            Chưa có chương mới
+                                                        </button>
                                                     )}
                                                 </div>
 
@@ -268,7 +311,6 @@
                                                     </span>
                                                 </h3>
 
-                                                {/* DANH SÁCH CHƯƠNG (MỚI NHẤT LÊN ĐẦU) */}
                                                 <div className="chapter-list max-h-[500px] overflow-y-auto pr-2 space-y-3">
                                                     {isLoading ? (
                                                         <div className="flex justify-center p-10"><div className="loader"></div></div>
@@ -281,7 +323,7 @@
                                                                     <span className="text-[10px] opacity-60 mt-1">{ch.updatedAt || "Vừa xong"}</span>
                                                                 </div>
                                                                 <span className="text-[10px] font-bold bg-blue-100 text-blue-500 group-hover:bg-white/20 group-hover:text-white px-2 py-1 rounded uppercase tracking-tighter">
-                                                                    {ch.totalImages} trang
+                                                                    {ch.totalImages || "?"} trang
                                                                 </span>
                                                             </div>
                                                         ))
