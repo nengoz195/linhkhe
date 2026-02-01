@@ -40,8 +40,6 @@
                 poster: "https://lh3.googleusercontent.com/pw/AP1GczNjbo5BXxddIRdCjw5_D_ZlgysBO3-3YHTMiFL-v32MIi51ut2AuP2o6HdNd1bumiaCoCKYiySt41HSllXq8MrctPlWDeJWRU_eTwh1TdIQ7wzX59y6NtBtHOvs2nXkK5gpA3__oEG4N27MScaHlbk=w670-h947-s-no-gm?authuser=0",
                 desc: "Câu chuyện một người một hồn kết thành nhóm mà sống đồng thời cứu vớt thế giới. Một câu chuyện hư cấu dưới bối cảnh thành phố hiện đại về cứu rỗi và cứu rỗi bản thân...",
                 author: "Bình Tử",
-                lastChapterLabel: "Chương 584",
-                lastUpdate: "2 giờ trước",
                 jsonUrl: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data.json',
                 folder: 'linh-khe'
             },
@@ -53,8 +51,6 @@
                 fallbackPoster: "https://st63178.ispot.cc/stories/linh-khe-lac-nguyet-son-ha.jpg",
                 desc: "Câu chuyện nhỏ của hai cụ tổ.",
                 author: "Bình Tử",
-                lastChapterLabel: "Chương 16",
-                lastUpdate: "Vừa xong",
                 jsonUrl: 'https://raw.githubusercontent.com/nengoz195/data-truyen-tranh/main/data-lnsh.json',
                 folder: 'nguyet-lac'
             }
@@ -66,6 +62,45 @@
             const [chapters, setChapters] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
             const [readingChapter, setReadingChapter] = useState(null);
+            
+            // State mới để lưu thông tin cập nhật tự động cho từng truyện
+            const [seriesUpdates, setSeriesUpdates] = useState({});
+
+            // Effect để tự động fetch thông tin mới nhất cho trang chủ
+            useEffect(() => {
+                const fetchLatestUpdates = async () => {
+                    const updates = {};
+                    
+                    await Promise.all(SERIES_DATA.map(async (series) => {
+                        try {
+                            // Thêm timestamp để tránh cache trình duyệt
+                            const cacheBuster = `?t=${new Date().getTime()}`;
+                            const res = await fetch(series.jsonUrl + cacheBuster);
+                            if (!res.ok) throw new Error("Network response was not ok");
+                            
+                            const data = await res.json();
+                            
+                            if (data && data.length > 0) {
+                                const lastChapter = data[data.length - 1];
+                                updates[series.id] = {
+                                    chapterLabel: lastChapter.title,
+                                    timeLabel: lastChapter.updatedAt || "Vừa xong",
+                                    loaded: true
+                                };
+                            } else {
+                                updates[series.id] = { chapterLabel: "Chưa có chương", timeLabel: "--", loaded: true };
+                            }
+                        } catch (error) {
+                            console.error(`Lỗi tải dữ liệu cho ${series.title}:`, error);
+                            updates[series.id] = { chapterLabel: "Lỗi tải", timeLabel: "Thử lại sau", loaded: true };
+                        }
+                    }));
+                    
+                    setSeriesUpdates(updates);
+                };
+
+                fetchLatestUpdates();
+            }, []);
 
             const handleSelectSeries = async (series) => {
                 setSelectedSeries(series);
@@ -138,27 +173,42 @@
                             {/* TRANG CHỦ: CHỌN TAG */}
                             {view === 'home' && (
                                 <div className="max-w-4xl mx-auto grid grid-cols-2 gap-6 sm:gap-10 mt-6 animate-fade-in">
-                                    {SERIES_DATA.map(series => (
-                                        <div key={series.id} onClick={() => handleSelectSeries(series)} className="comic-tag-card group">
-                                            <div className="aspect-[3/4.2] rounded-[2rem] overflow-hidden shadow-2xl mb-4 bg-white/50 border-4 border-white">
-                                                <img 
-                                                    src={series.poster} 
-                                                    onError={(e) => { e.target.src = series.fallbackPoster || series.poster; }}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                />
-                                            </div>
-                                            <h3 className="font-bold text-lg sm:text-2xl text-blue-900 line-clamp-1 px-2 mb-1 group-hover:text-blue-600 transition-colors">{series.title}</h3>
-                                            <div className="flex items-center justify-between px-2">
-                                                <span className="text-xs sm:text-sm text-blue-600 font-bold">{series.lastChapterLabel}</span>
-                                                <div className="flex items-center gap-1 text-gray-500 text-[10px] sm:text-xs">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                    <span>{series.lastUpdate}</span>
+                                    {SERIES_DATA.map(series => {
+                                        // Lấy dữ liệu động từ state
+                                        const updateInfo = seriesUpdates[series.id] || {};
+                                        const chapterLabel = updateInfo.loaded ? updateInfo.chapterLabel : "Đang tải...";
+                                        const timeLabel = updateInfo.loaded ? updateInfo.timeLabel : "...";
+
+                                        return (
+                                            <div key={series.id} onClick={() => handleSelectSeries(series)} className="comic-tag-card group">
+                                                <div className="aspect-[3/4.2] rounded-[2rem] overflow-hidden shadow-2xl mb-4 bg-white/50 border-4 border-white relative">
+                                                    <img 
+                                                        src={series.poster} 
+                                                        onError={(e) => { e.target.src = series.fallbackPoster || series.poster; }}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    />
+                                                    {/* Badge trạng thái loading nếu chưa tải xong */}
+                                                    {!updateInfo.loaded && (
+                                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                                            <div className="loader !w-6 !h-6 !border-2"></div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <h3 className="font-bold text-lg sm:text-2xl text-blue-900 line-clamp-1 px-2 mb-1 group-hover:text-blue-600 transition-colors">{series.title}</h3>
+                                                <div className="flex items-center justify-between px-2">
+                                                    <span className={`text-xs sm:text-sm font-bold ${updateInfo.loaded ? 'text-blue-600' : 'text-gray-400'}`}>
+                                                        {chapterLabel}
+                                                    </span>
+                                                    <div className="flex items-center gap-1 text-gray-500 text-[10px] sm:text-xs">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        <span>{timeLabel}</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
 
@@ -287,7 +337,3 @@
     </script>
 </body>
 </html>
-
-
-
-
